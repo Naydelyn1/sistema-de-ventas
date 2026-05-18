@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+enum Rol {
+  ADMIN
+  CAJERO
+  ALMACENERO
+}
+
+model Usuario {
+  id                Int       @id @default(autoincrement())
+  nombre            String
+  email             String    @unique
+  password          String
+  rol               Rol       @default(CAJERO)
+  activo            Boolean   @default(true)
+  creadoEn          DateTime  @default(now())
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  ventas            Venta[]
+  compras           Compra[]
+}
+
+model Categoria {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @unique
+  productos Producto[]
+}
+
+model Producto {
+  id              Int              @id @default(autoincrement())
+  nombre          String
+  descripcion     String?
+  precio          Decimal          @db.Decimal(10, 2)
+  stock           Int              @default(0)
+  stockMinimo     Int              @default(5)
+  activo          Boolean          @default(true)
+  categoriaId     Int
+  categoria       Categoria        @relation(fields: [categoriaId], references: [id])
+  creadoEn        DateTime         @default(now())
+  detallesVenta   DetalleVenta[]
+  detallesCompra  DetalleCompra[]
+  
+  // Campos solo para farmacia
+  lote            String?
+  fechaVencimiento DateTime?
+  registroSanitario String?
+}
+
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  dni       String?  @unique
+  telefono  String?
+  email     String?
+  direccion String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+  ventas    Venta[]
+}
+
+model Proveedor {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  ruc       String?   @unique
+  contacto  String?
+  telefono  String?
+  email     String?
+  activo    Boolean   @default(true)
+  compras   Compra[]
+}
+
+model Venta {
+  id         Int            @id @default(autoincrement())
+  fecha      DateTime       @default(now())
+  total      Decimal        @db.Decimal(10, 2)
+  usuarioId  Int
+  usuario    Usuario        @relation(fields: [usuarioId], references: [id])
+  clienteId  Int?
+  cliente    Cliente?       @relation(fields: [clienteId], references: [id])
+  detalles   DetalleVenta[]
+}
+
+model DetalleVenta {
+  id             Int      @id @default(autoincrement())
+  ventaId        Int
+  venta          Venta    @relation(fields: [ventaId], references: [id])
+  productoId     Int
+  producto       Producto @relation(fields: [productoId], references: [id])
+  cantidad       Int
+  precioUnitario Decimal  @db.Decimal(10, 2)
+  subtotal       Decimal  @db.Decimal(10, 2)
+}
+
+model Compra {
+  id          Int             @id @default(autoincrement())
+  fecha       DateTime        @default(now())
+  total       Decimal         @db.Decimal(10, 2)
+  proveedorId Int?
+  proveedor   Proveedor?      @relation(fields: [proveedorId], references: [id])
+  usuarioId   Int?
+  usuario     Usuario?        @relation(fields: [usuarioId], references: [id])
+  detalles    DetalleCompra[]
+}
+
+model DetalleCompra {
+  id            Int      @id @default(autoincrement())
+  compraId      Int
+  compra        Compra   @relation(fields: [compraId], references: [id])
+  productoId    Int
+  producto      Producto @relation(fields: [productoId], references: [id])
+  cantidad      Int
+  precioCompra  Decimal  @db.Decimal(10, 2)
+  subtotal      Decimal  @db.Decimal(10, 2)
+}
