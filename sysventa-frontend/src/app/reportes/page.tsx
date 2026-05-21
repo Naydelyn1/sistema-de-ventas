@@ -1,228 +1,227 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
-import api from '@/lib/axios'
-import { Producto, ResumenDia, ProductoMasVendido } from '@/lib/types'
-import { TrendingUp, AlertTriangle, Calendar } from 'lucide-react'
+import { FileSpreadsheet, Download, Package, TrendingUp, ShoppingBag, Loader2 } from 'lucide-react'
+import Cookies from 'js-cookie'
 
-interface VentaFecha {
-  fecha: string
-  total: number
-  cantidad: number
+type DownloadState = 'idle' | 'loading' | 'done' | 'error'
+
+function today() {
+  return new Date().toISOString().split('T')[0]
+}
+
+function firstOfMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+async function descargarExcel(url: string, filename: string) {
+  const token = Cookies.get('token')
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error('Error al generar el reporte')
+  const blob = await res.blob()
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+interface ReporteCardProps {
+  icon: React.ReactNode
+  title: string
+  description: string
+  color: string
+  onDescargar: () => Promise<void>
+  estado: DownloadState
+  children?: React.ReactNode
+}
+
+function ReporteCard({ icon, title, description, color, onDescargar, estado, children }: ReporteCardProps) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-800">{title}</h3>
+          <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+        </div>
+      </div>
+      {children}
+      <button
+        onClick={onDescargar}
+        disabled={estado === 'loading'}
+        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+          estado === 'done'
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : estado === 'error'
+            ? 'bg-red-50 text-red-700 border border-red-200'
+            : 'bg-blue-600 hover:bg-blue-700 text-white'
+        }`}
+      >
+        {estado === 'loading' ? (
+          <><Loader2 className="w-4 h-4 animate-spin" />Generando...</>
+        ) : estado === 'done' ? (
+          <><Download className="w-4 h-4" />Descargado</>
+        ) : estado === 'error' ? (
+          'Error — reintentar'
+        ) : (
+          <><Download className="w-4 h-4" />Descargar Excel</>
+        )}
+      </button>
+    </div>
+  )
 }
 
 export default function ReportesPage() {
-  const [resumen, setResumen] = useState<ResumenDia | null>(null)
-  const [masVendidos, setMasVendidos] = useState<ProductoMasVendido[]>([])
-  const [stockBajo, setStockBajo] = useState<Producto[]>([])
-  const [ventasFecha, setVentasFecha] = useState<VentaFecha[]>([])
-  const today = new Date().toISOString().split('T')[0]
-  const [desde, setDesde] = useState(today)
-  const [hasta, setHasta] = useState(today)
-  const [loading, setLoading] = useState(true)
-  const [loadingFecha, setLoadingFecha] = useState(false)
-  const [buscado, setBuscado] = useState(false)
+  const [desdeVentas, setDesdeVentas] = useState(firstOfMonth())
+  const [hastaVentas, setHastaVentas] = useState(today())
+  const [desdeCompras, setDesdeCompras] = useState(firstOfMonth())
+  const [hastaCompras, setHastaCompras] = useState(today())
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [resRes, masRes, stockRes] = await Promise.allSettled([
-          api.get<ResumenDia>('/reportes/resumen-dia'),
-          api.get<ProductoMasVendido[]>('/reportes/productos-mas-vendidos'),
-          api.get<Producto[]>('/reportes/stock-bajo'),
-        ])
-        if (resRes.status === 'fulfilled') setResumen(resRes.value.data)
-        if (masRes.status === 'fulfilled') setMasVendidos(masRes.value.data)
-        if (stockRes.status === 'fulfilled') setStockBajo(stockRes.value.data)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchAll()
-  }, [])
+  const [estadoVentas, setEstadoVentas] = useState<DownloadState>('idle')
+  const [estadoCompras, setEstadoCompras] = useState<DownloadState>('idle')
+  const [estadoStock, setEstadoStock] = useState<DownloadState>('idle')
 
-  const buscarPorFecha = async () => {
-    setLoadingFecha(true)
-    setBuscado(false)
+  const base = process.env.NEXT_PUBLIC_API_URL!
+
+  const handleVentas = async () => {
+    setEstadoVentas('loading')
     try {
-      const res = await api.get<VentaFecha[]>(
-        `/reportes/ventas-por-fecha?desde=${desde}&hasta=${hasta}`
+      await descargarExcel(
+        `${base}/reportes/excel/ventas?desde=${desdeVentas}&hasta=${hastaVentas}`,
+        `ventas-${desdeVentas}-${hastaVentas}.xlsx`,
       )
-      setVentasFecha(res.data)
-    } finally {
-      setLoadingFecha(false)
-      setBuscado(true)
+      setEstadoVentas('done')
+      setTimeout(() => setEstadoVentas('idle'), 3000)
+    } catch {
+      setEstadoVentas('error')
+      setTimeout(() => setEstadoVentas('idle'), 4000)
     }
   }
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent" />
-        </div>
-      </DashboardLayout>
-    )
+  const handleCompras = async () => {
+    setEstadoCompras('loading')
+    try {
+      await descargarExcel(
+        `${base}/reportes/excel/compras?desde=${desdeCompras}&hasta=${hastaCompras}`,
+        `compras-${desdeCompras}-${hastaCompras}.xlsx`,
+      )
+      setEstadoCompras('done')
+      setTimeout(() => setEstadoCompras('idle'), 3000)
+    } catch {
+      setEstadoCompras('error')
+      setTimeout(() => setEstadoCompras('idle'), 4000)
+    }
+  }
+
+  const handleStock = async () => {
+    setEstadoStock('loading')
+    try {
+      await descargarExcel(`${base}/reportes/excel/stock`, `stock-${today()}.xlsx`)
+      setEstadoStock('done')
+      setTimeout(() => setEstadoStock('idle'), 3000)
+    } catch {
+      setEstadoStock('error')
+      setTimeout(() => setEstadoStock('idle'), 4000)
+    }
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Resumen del día */}
-        {resumen && (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {[
-              { label: 'Ventas hoy', value: resumen.cantidadVentas, sub: 'ventas', color: 'text-blue-700', bg: 'bg-blue-50' },
-              { label: 'Ingresos hoy', value: `S/ ${(Number(resumen.totalVentas) || 0).toFixed(2)}`, color: 'text-green-700', bg: 'bg-green-50' },
-              { label: 'Compras hoy', value: resumen.cantidadCompras, sub: 'compras', color: 'text-purple-700', bg: 'bg-purple-50' },
-              { label: 'Gasto en compras', value: `S/ ${(Number(resumen.totalCompras) || 0).toFixed(2)}`, color: 'text-orange-700', bg: 'bg-orange-50' },
-              { label: 'Ganancia del dia', value: `S/ ${(Number(resumen.ganancia) || 0).toFixed(2)}`, color: resumen.ganancia >= 0 ? 'text-green-700' : 'text-red-600', bg: resumen.ganancia >= 0 ? 'bg-green-50' : 'bg-red-50' },
-            ].map((card) => (
-              <div key={card.label} className={`${card.bg} rounded-xl p-5`}>
-                <p className="text-xs font-medium text-gray-500 mb-1">{card.label}</p>
-                <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
-                {card.sub && <p className="text-xs text-gray-400 mt-0.5">{card.sub}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Más vendidos */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-gray-800">Productos mas vendidos</h3>
-            </div>
-            <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Producto', 'Unidades', 'Ingresos'].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-500">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {masVendidos.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-gray-400 text-sm">
-                      Sin datos disponibles
-                    </td>
-                  </tr>
-                ) : (
-                  masVendidos.map((p) => (
-                    <tr key={p.producto?.id}>
-                      <td className="px-6 py-3 font-medium text-gray-800">{p.producto?.nombre}</td>
-                      <td className="px-6 py-3 text-gray-600">{Number(p.cantidadVendida).toLocaleString('es-PE')}</td>
-                      <td className="px-6 py-3 font-semibold text-green-700">S/ {(Number(p.totalGenerado) || 0).toFixed(2)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            </div>
-          </div>
-
-          {/* Stock bajo */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-yellow-500" />
-              <h3 className="font-semibold text-gray-800">Productos con stock bajo</h3>
-            </div>
-            <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Producto', 'Stock', 'Minimo'].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-500">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {stockBajo.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-gray-400 text-sm">
-                      Todo el stock esta en orden
-                    </td>
-                  </tr>
-                ) : (
-                  stockBajo.map((p) => (
-                    <tr key={p.id}>
-                      <td className="px-6 py-3 font-medium text-gray-800">{p.nombre}</td>
-                      <td className="px-6 py-3 text-red-600 font-semibold">{p.stock}</td>
-                      <td className="px-6 py-3 text-gray-500">{p.stockMinimo}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            </div>
-          </div>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Reportes</h2>
+          <p className="text-sm text-gray-400 mt-0.5">Exporta la información del sistema en formato Excel</p>
         </div>
 
-        {/* Ventas por rango de fechas */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-800">Ventas por rango de fechas</h3>
-          </div>
-          <div className="flex flex-wrap gap-3 items-end mb-5">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
-              <input
-                type="date"
-                value={desde}
-                onChange={(e) => setDesde(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <ReporteCard
+            icon={<TrendingUp className="w-5 h-5 text-blue-600" />}
+            title="Reporte de Ventas"
+            description="Detalle de ventas con productos, clientes y formas de pago"
+            color="bg-blue-50"
+            onDescargar={handleVentas}
+            estado={estadoVentas}
+          >
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">Desde</label>
+                <input
+                  type="date"
+                  value={desdeVentas}
+                  onChange={(e) => setDesdeVentas(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                <input
+                  type="date"
+                  value={hastaVentas}
+                  onChange={(e) => setHastaVentas(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
-              <input
-                type="date"
-                value={hasta}
-                onChange={(e) => setHasta(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <button
-              onClick={buscarPorFecha}
-              disabled={loadingFecha}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-            >
-              {loadingFecha ? 'Buscando...' : 'Buscar'}
-            </button>
-          </div>
+          </ReporteCard>
 
-          {ventasFecha.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {['Fecha', 'N. Ventas', 'Total'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {ventasFecha.map((v, i) => (
-                    <tr key={i}>
-                      <td className="px-4 py-3 text-gray-800">{v.fecha}</td>
-                      <td className="px-4 py-3 text-gray-600">{Number(v.cantidad).toLocaleString('es-PE')}</td>
-                      <td className="px-4 py-3 font-semibold text-green-700">S/ {(Number(v.total) || 0).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <ReporteCard
+            icon={<ShoppingBag className="w-5 h-5 text-purple-600" />}
+            title="Reporte de Compras"
+            description="Registro de compras a proveedores con detalle de productos"
+            color="bg-purple-50"
+            onDescargar={handleCompras}
+            estado={estadoCompras}
+          >
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">Desde</label>
+                <input
+                  type="date"
+                  value={desdeCompras}
+                  onChange={(e) => setDesdeCompras(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                <input
+                  type="date"
+                  value={hastaCompras}
+                  onChange={(e) => setHastaCompras(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
-          )}
+          </ReporteCard>
 
-          {ventasFecha.length === 0 && !loadingFecha && (
-            <p className="text-sm text-gray-400 text-center py-4">
-              {buscado ? 'No hay ventas en ese rango de fechas' : 'Selecciona un rango y presiona Buscar'}
+          <ReporteCard
+            icon={<Package className="w-5 h-5 text-green-600" />}
+            title="Stock Actual"
+            description="Inventario completo con estado de cada producto"
+            color="bg-green-50"
+            onDescargar={handleStock}
+            estado={estadoStock}
+          >
+            <div className="bg-gray-50 rounded-lg px-4 py-3 text-xs text-gray-500">
+              Exporta el inventario completo a la fecha de hoy. Incluye estado: OK, Bajo stock y Agotado.
+            </div>
+          </ReporteCard>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+          <FileSpreadsheet className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-blue-800">Formato Excel (.xlsx)</p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              Los reportes incluyen encabezados coloreados, filas alternadas y fila de totales. Compatibles con Microsoft Excel, Google Sheets y LibreOffice Calc.
             </p>
-          )}
+          </div>
         </div>
       </div>
     </DashboardLayout>

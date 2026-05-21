@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
 import { Producto, ResumenDia } from '@/lib/types'
-import { ShoppingCart, TrendingUp, Package, AlertTriangle } from 'lucide-react'
+import { ShoppingCart, TrendingUp, Package, AlertTriangle, ArrowRight } from 'lucide-react'
 
 export default function DashboardPage() {
   const [resumen, setResumen] = useState<ResumenDia | null>(null)
@@ -15,7 +16,7 @@ export default function DashboardPage() {
       try {
         const [resRes, stockRes] = await Promise.allSettled([
           api.get<ResumenDia>('/reportes/resumen-dia'),
-          api.get<Producto[]>('/reportes/stock-bajo'),
+          api.get<Producto[]>('/productos/stock-bajo'),
         ])
         if (resRes.status === 'fulfilled') setResumen(resRes.value.data)
         if (stockRes.status === 'fulfilled') setStockBajo(stockRes.value.data)
@@ -83,30 +84,43 @@ export default function DashboardPage() {
           </div>
 
           {stockBajo.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                Productos con stock bajo
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-500 border-b">
-                      <th className="pb-3 font-medium">Producto</th>
-                      <th className="pb-3 font-medium">Stock actual</th>
-                      <th className="pb-3 font-medium">Stock minimo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {stockBajo.map((p) => (
-                      <tr key={p.id}>
-                        <td className="py-3 font-medium text-gray-800">{p.nombre}</td>
-                        <td className="py-3 text-red-600 font-semibold">{p.stock}</td>
-                        <td className="py-3 text-gray-500">{p.stockMinimo}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                  Productos con stock bajo
+                  <span className="ml-1 bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {stockBajo.length}
+                  </span>
+                </h3>
+                <Link href="/kardex" className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium">
+                  Ver Kardex <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {stockBajo.map((p) => {
+                  const pct = p.stockMinimo > 0 ? Math.min(100, (p.stock / p.stockMinimo) * 100) : 0
+                  return (
+                    <div key={p.id} className="px-6 py-3 flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+                        <p className="text-xs text-gray-400">{p.categoria?.nombre}</p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="w-24 bg-gray-100 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${p.stock === 0 ? 'bg-red-500' : 'bg-yellow-400'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className={`text-sm font-bold w-8 text-right ${p.stock === 0 ? 'text-red-600' : 'text-yellow-600'}`}>
+                          {p.stock}
+                        </span>
+                        <span className="text-xs text-gray-400">/ {p.stockMinimo}</span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

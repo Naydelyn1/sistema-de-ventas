@@ -10,6 +10,8 @@ import { ProveedoresModule } from './proveedores/proveedores.module'
 import { VentasModule } from './ventas/ventas.module'
 import { ComprasModule } from './compras/compras.module'
 import { ReportesModule } from './reportes/reportes.module'
+import { FacturacionModule } from './facturacion/facturacion.module'
+import { CajaModule } from './caja/caja.module'
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { ReportesModule } from './reportes/reportes.module'
     VentasModule,
     ComprasModule,
     ReportesModule,
+    FacturacionModule,
+    CajaModule,
   ],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { IsNumber, IsArray, ValidateNested, Min, IsOptional } from 'class-validator'
+import { IsNumber, IsArray, ValidateNested, Min, IsOptional, IsString } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class DetalleCompraDto {
@@ -22,6 +22,14 @@ export class CrearCompraDto {
   @IsNumber()
   @Type(() => Number)
   proveedorId?: number
+
+  @IsOptional()
+  @IsString()
+  serieComprobante?: string
+
+  @IsOptional()
+  @IsString()
+  numeroComprobante?: string
 
   @IsArray()
   @ValidateNested({ each: true })

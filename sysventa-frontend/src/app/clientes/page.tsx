@@ -5,7 +5,7 @@ import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import api from '@/lib/axios'
 import { Cliente } from '@/lib/types'
-import { Plus, Search, X, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Search, X, Pencil, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
 import Pagination from '@/components/Pagination'
 
 interface ClienteForm {
@@ -35,6 +35,8 @@ export default function ClientesPage() {
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<'activos' | 'inactivos' | 'todos'>('activos')
   const [saving, setSaving] = useState(false)
+  const [dniLoading, setDniLoading] = useState(false)
+  const [dniError, setDniError] = useState('')
   const [page, setPage] = useState(1)
   const { toast, showToast, closeToast } = useToast()
 
@@ -63,7 +65,24 @@ export default function ClientesPage() {
     return true
   })
 
-  const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm) }
+  const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm); setDniError('') }
+
+  const buscarDni = async () => {
+    if (form.dni.length !== 8) return
+    setDniLoading(true)
+    setDniError('')
+    try {
+      const res = await api.get(`/clientes/reniec/${form.dni}`)
+      setForm((prev) => ({ ...prev, nombre: res.data.nombre }))
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'No se pudo obtener datos del DNI'
+      setDniError(msg)
+    } finally {
+      setDniLoading(false)
+    }
+  }
 
   const openEdit = (c: Cliente) => {
     setEditId(c.id)
@@ -85,7 +104,7 @@ export default function ClientesPage() {
     ...(form.direccion && { direccion: form.direccion }),
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setSaving(true)
     try {
@@ -254,13 +273,40 @@ export default function ClientesPage() {
                 {fields.map(({ key, label, required, type }) => (
                   <div key={key}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                    <input
-                      required={required}
-                      type={type}
-                      value={form[key]}
-                      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    {key === 'dni' ? (
+                      <>
+                        <div className="flex gap-2">
+                          <input
+                            required={required}
+                            type={type}
+                            maxLength={8}
+                            value={form.dni}
+                            onChange={(e) => { setForm({ ...form, dni: e.target.value }); setDniError('') }}
+                            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={buscarDni}
+                            disabled={dniLoading || form.dni.length !== 8}
+                            title="Buscar en RENIEC"
+                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm disabled:opacity-40 flex items-center"
+                          >
+                            {dniLoading
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <Search className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {dniError && <p className="text-xs text-red-500 mt-1">{dniError}</p>}
+                      </>
+                    ) : (
+                      <input
+                        required={required}
+                        type={type}
+                        value={form[key]}
+                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    )}
                   </div>
                 ))}
                 <div className="flex gap-3 pt-2">

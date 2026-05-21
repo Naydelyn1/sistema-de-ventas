@@ -17,6 +17,12 @@ export class ProductosController {
     return this.productosService.crear(dto)
   }
 
+  @Roles('ADMIN')
+  @Post('backfill-kardex')
+  backfillKardex() {
+    return this.productosService.backfillKardex()
+  }
+
   @Get()
   findAll(@Query('todos') todos?: string) {
     return this.productosService.findAll(todos !== 'true')
@@ -30,6 +36,15 @@ export class ProductosController {
   @Get('por-vencer')
   porVencer() {
     return this.productosService.porVencer()
+  }
+
+  @Get(':id/kardex')
+  kardex(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    return this.productosService.kardex(id, desde, hasta)
   }
 
   @Get(':id')

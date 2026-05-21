@@ -25,6 +25,8 @@ export default function ComprasPage() {
   const [cantidad, setCantidad] = useState('1')
   const [precioUnitario, setPrecioUnitario] = useState('')
   const [proveedorId, setProveedorId] = useState('')
+  const [serieComprobante, setSerieComprobante] = useState('')
+  const [numeroComprobante, setNumeroComprobante] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadingCompras, setLoadingCompras] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -101,9 +103,13 @@ export default function ComprasPage() {
         })),
       }
       if (proveedorId) body.proveedorId = parseInt(proveedorId)
+      if (serieComprobante) body.serieComprobante = serieComprobante.toUpperCase()
+      if (numeroComprobante) body.numeroComprobante = numeroComprobante
       await api.post('/compras', body)
       setCarrito([])
       setProveedorId('')
+      setSerieComprobante('')
+      setNumeroComprobante('')
       buscarCompras()
       showToast('Compra registrada correctamente')
     } catch {
@@ -116,92 +122,125 @@ export default function ComprasPage() {
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Panel nueva compra */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-purple-600" />
-              Nueva Compra
-            </h3>
+      <div className="flex flex-col gap-6">
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Proveedor (opcional)
-              </label>
-              <SearchableSelect
-                value={proveedorId}
-                onChange={setProveedorId}
-                emptyOption="Sin proveedor"
-                options={proveedores.map((p) => ({
-                  value: String(p.id),
-                  label: p.nombre + (p.ruc ? ` — ${p.ruc}` : ''),
-                }))}
-              />
-            </div>
+        {/* Nueva Compra — horizontal top panel */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
+            <Package className="w-5 h-5 text-purple-600" />
+            <h3 className="font-semibold text-gray-800">Nueva Compra</h3>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_260px_1fr_210px] divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
 
-            <div className="space-y-2 mb-4">
-              <select
-                value={productoSelId}
-                onChange={(e) => setProductoSelId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">Seleccionar producto...</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} (stock: {p.stock})
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <input
-                  inputMode="decimal"
-                  placeholder="Precio unit."
-                  value={precioUnitario}
-                  onChange={(e) => setPrecioUnitario(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            {/* Col 1: Proveedor + Comprobante */}
+            <div className="p-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Proveedor</p>
+              <div className="space-y-3">
+                <SearchableSelect
+                  value={proveedorId}
+                  onChange={setProveedorId}
+                  emptyOption="Sin proveedor"
+                  options={proveedores.map((p) => ({
+                    value: String(p.id),
+                    label: p.nombre + (p.ruc ? ` — ${p.ruc}` : ''),
+                  }))}
                 />
-                <input
-                  inputMode="numeric"
-                  placeholder="Cant."
-                  value={cantidad}
-                  onChange={(e) => setCantidad(e.target.value)}
-                  className="w-20 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <button
-                  onClick={agregarAlCarrito}
-                  disabled={!productoSelId || !precioUnitario}
-                  className="bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-lg disabled:opacity-40"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Comprobante <span className="text-gray-400">(opcional)</span>
+                  </p>
+                  <div className="flex gap-2 min-w-0">
+                    <input
+                      type="text"
+                      value={serieComprobante}
+                      onChange={(e) => setSerieComprobante(e.target.value)}
+                      placeholder="F001"
+                      maxLength={4}
+                      className="w-20 border border-gray-300 rounded-lg px-2 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={numeroComprobante}
+                      onChange={(e) => setNumeroComprobante(e.target.value.replace(/\D/g, ''))}
+                      placeholder="00001234"
+                      maxLength={8}
+                      className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  {serieComprobante && numeroComprobante && (
+                    <p className="text-xs text-purple-600 mt-1 font-medium">
+                      {serieComprobante.toUpperCase()}-{numeroComprobante.padStart(8, '0')}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="min-h-24 mb-4">
+            {/* Col 2: Producto + Precio + Cantidad */}
+            <div className="p-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Producto</p>
+              <div className="space-y-2">
+                <select
+                  value={productoSelId}
+                  onChange={(e) => setProductoSelId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Seleccionar producto...</option>
+                  {productos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} (stock: {p.stock})
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2 min-w-0">
+                  <input
+                    inputMode="decimal"
+                    placeholder="Precio unit."
+                    value={precioUnitario}
+                    onChange={(e) => setPrecioUnitario(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <input
+                    inputMode="numeric"
+                    placeholder="Cant."
+                    value={cantidad}
+                    onChange={(e) => setCantidad(e.target.value)}
+                    className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={agregarAlCarrito}
+                    disabled={!productoSelId || !precioUnitario}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg disabled:opacity-40 flex items-center gap-1 text-sm font-medium shrink-0"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Col 3: Carrito */}
+            <div className="p-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+                Carrito {carrito.length > 0 && <span className="text-purple-600">({carrito.length})</span>}
+              </p>
               {carrito.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-6">Carrito vacío</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {carrito.map((item) => (
-                    <div
-                      key={item.productoId}
-                      className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{item.nombre}</p>
+                    <div key={item.productoId} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-800 truncate">{item.nombre}</p>
                         <p className="text-xs text-gray-500">
                           x{item.cantidad} × S/ {(Number(item.precioUnitario) || 0).toFixed(2)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
                         <span className="text-sm font-semibold text-gray-800">
                           S/ {((Number(item.precioUnitario) || 0) * (Number(item.cantidad) || 0)).toFixed(2)}
                         </span>
-                        <button
-                          onClick={() => quitarItem(item.productoId)}
-                          className="text-red-400 hover:text-red-600"
-                        >
+                        <button onClick={() => quitarItem(item.productoId)} className="text-red-400 hover:text-red-600">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -211,84 +250,85 @@ export default function ComprasPage() {
               )}
             </div>
 
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-semibold text-gray-700">Total</span>
-                <span className="text-2xl font-bold text-purple-700">S/ {(Number(total) || 0).toFixed(2)}</span>
+            {/* Col 4: Total + Registrar */}
+            <div className="p-4 flex flex-col justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Total</p>
+                <p className="text-3xl font-bold text-purple-700 mb-1">S/ {(Number(total) || 0).toFixed(2)}</p>
+                {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
               </div>
-              {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
               <button
                 onClick={handleRegistrarCompra}
                 disabled={saving || carrito.length === 0}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg font-medium text-sm disabled:opacity-50 transition-colors"
+                className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg font-medium text-sm disabled:opacity-50 transition-colors"
               >
                 {saving ? 'Registrando...' : 'Registrar Compra'}
               </button>
             </div>
+
           </div>
         </div>
 
-        {/* Historial de compras */}
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 space-y-3">
-              <h3 className="font-semibold text-gray-800">Historial de Compras</h3>
-              <div className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Desde</label>
-                  <input
-                    type="date"
-                    value={desde}
-                    onChange={(e) => setDesde(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Hasta</label>
-                  <input
-                    type="date"
-                    value={hasta}
-                    onChange={(e) => setHasta(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
+        {/* Historial de Compras */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 space-y-3">
+            <h3 className="font-semibold text-gray-800">Historial de Compras</h3>
+            <div className="flex flex-wrap items-end gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Desde</label>
+                <input
+                  type="date"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                <input
+                  type="date"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <button
+                onClick={() => buscarCompras()}
+                disabled={loadingCompras}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+              >
+                {loadingCompras ? 'Buscando...' : 'Buscar'}
+              </button>
+              {(desde || hasta) && (
                 <button
-                  onClick={() => buscarCompras()}
-                  disabled={loadingCompras}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                  onClick={() => { setDesde(''); setHasta(''); buscarCompras('', '') }}
+                  className="text-sm text-gray-400 hover:text-gray-600 px-2 py-1.5"
                 >
-                  {loadingCompras ? 'Buscando...' : 'Buscar'}
+                  Limpiar
                 </button>
-                {(desde || hasta) && (
-                  <button
-                    onClick={() => { setDesde(''); setHasta(''); buscarCompras('', '') }}
-                    className="text-sm text-gray-400 hover:text-gray-600 px-2 py-1.5"
-                  >
-                    Limpiar
-                  </button>
-                )}
-                {compras.length > 0 && (
-                  <span className="text-xs text-gray-500 ml-auto self-end">
-                    {compras.length} compra{compras.length !== 1 ? 's' : ''} —{' '}
-                    <span className="font-semibold text-purple-700">
-                      S/ {compras.reduce((s, c) => s + (Number(c.total) || 0), 0).toFixed(2)}
-                    </span>
+              )}
+              {compras.length > 0 && (
+                <span className="text-xs text-gray-500 ml-auto self-end">
+                  {compras.length} compra{compras.length !== 1 ? 's' : ''} —{' '}
+                  <span className="font-semibold text-purple-700">
+                    S/ {compras.reduce((s, c) => s + (Number(c.total) || 0), 0).toFixed(2)}
                   </span>
-                )}
-              </div>
+                </span>
+              )}
             </div>
-            {loadingCompras ? (
-              <div className="flex justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent" />
-              </div>
-            ) : loading ? (
-              <div className="flex justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent" />
-              </div>
-            ) : compras.length === 0 ? (
-              <p className="text-center text-gray-400 py-12 text-sm">No hay compras registradas</p>
-            ) : (
-              <>
+          </div>
+          {loadingCompras ? (
+            <div className="flex justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent" />
+            </div>
+          ) : loading ? (
+            <div className="flex justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent" />
+            </div>
+          ) : compras.length === 0 ? (
+            <p className="text-center text-gray-400 py-12 text-sm">No hay compras registradas</p>
+          ) : (
+            <>
               <div className="divide-y divide-gray-100">
                 {comprasPag.map((c) => (
                   <div key={c.id} className="px-6 py-4">
@@ -310,7 +350,12 @@ export default function ComprasPage() {
                         </p>
                       ))}
                       {c.proveedor && (
-                        <p className="text-purple-500 font-medium">Proveedor: {c.proveedor.nombre}</p>
+                        <p className="text-purple-500 font-medium">Proveedor: {c.proveedor.nombre}{c.proveedor.ruc ? ` (${c.proveedor.ruc})` : ''}</p>
+                      )}
+                      {c.serieComprobante && c.numeroComprobante && (
+                        <p className="text-green-600 font-medium">
+                          Comprobante: {c.serieComprobante}-{c.numeroComprobante.padStart(8, '0')}
+                        </p>
                       )}
                       <p className="text-gray-400">Registrado por: {c.usuario?.nombre ?? '-'}</p>
                     </div>
@@ -318,9 +363,8 @@ export default function ComprasPage() {
                 ))}
               </div>
               <Pagination total={compras.length} page={page} pageSize={15} onChange={setPage} />
-              </>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}

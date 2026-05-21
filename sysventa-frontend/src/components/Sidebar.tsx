@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Package, Tag, Users, Truck,
-  ShoppingCart, ShoppingBag, UserCog, TrendingUp, Store,
+  ShoppingCart, ShoppingBag, UserCog, TrendingUp, Store, ClipboardList, Wallet,
 } from 'lucide-react'
 import { getUsuario } from '@/lib/auth'
 import { Usuario } from '@/lib/types'
@@ -20,11 +20,16 @@ const navItems = [
 
 const almacenItems = [
   { href: '/compras', icon: ShoppingBag, label: 'Compras' },
+  { href: '/kardex', icon: ClipboardList, label: 'Kardex' },
 ]
 
 const adminItems = [
   { href: '/usuarios', icon: UserCog, label: 'Usuarios' },
   { href: '/reportes', icon: TrendingUp, label: 'Reportes' },
+]
+
+const cajaItems = [
+  { href: '/caja', icon: Wallet, label: 'Caja' },
 ]
 
 export default function Sidebar() {
@@ -71,6 +76,28 @@ export default function Sidebar() {
                 Almacen
               </p>
               {almacenItems.map(({ href, icon: Icon, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(href)
+                      ? 'bg-blue-700 text-white'
+                      : 'text-blue-200 hover:bg-blue-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {label}
+                </Link>
+              ))}
+            </>
+          )}
+
+          {(usuario?.rol === 'ADMIN' || usuario?.rol === 'CAJERO') && (
+            <>
+              <p className="px-3 pt-4 pb-1 text-blue-400 text-xs uppercase tracking-wider font-semibold">
+                Caja
+              </p>
+              {cajaItems.map(({ href, icon: Icon, label }) => (
                 <Link
                   key={href}
                   href={href}

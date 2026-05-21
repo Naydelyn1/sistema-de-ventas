@@ -7,40 +7,28 @@ export class VentasService {
   constructor(private prisma: PrismaService) {}
 
   async crear(dto: CrearVentaDto, usuarioId: number) {
-    // Verificar stock de todos los productos
+    const turnoAbierto = await this.prisma.turnoCaja.findFirst({ where: { estado: 'ABIERTO' } })
+    if (!turnoAbierto) throw new BadRequestException('No hay un turno de caja abierto. Abre el turno antes de realizar ventas.')
+
     for (const detalle of dto.detalles) {
-      const producto = await this.prisma.producto.findUnique({
-        where: { id: detalle.productoId },
-      })
-
-      if (!producto || !producto.activo) {
-        throw new NotFoundException(`Producto ${detalle.productoId} no encontrado`)
-      }
-
-      if (producto.stock < detalle.cantidad) {
-        throw new BadRequestException(
-          `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}`
-        )
-      }
+      const producto = await this.prisma.producto.findUnique({ where: { id: detalle.productoId } })
+      if (!producto || !producto.activo) throw new NotFoundException(`Producto ${detalle.productoId} no encontrado`)
+      if (producto.stock < detalle.cantidad) throw new BadRequestException(
+        `Stock insuficiente para ${producto.nombre}. Disponible: ${producto.stock}`
+      )
     }
 
-    // Crear venta con transacción
+    const descPct = dto.descuentoPct ?? 0
+    const formaPago = dto.formaPago ?? 'EFECTIVO'
+
     const venta = await this.prisma.$transaction(async (tx) => {
-      let total = 0
-      const detallesData: {
-        productoId: number
-        cantidad: number
-        precioUnitario: any
-        subtotal: number
-      }[] = []
+      let totalBruto = 0
+      const detallesData: { productoId: number; cantidad: number; precioUnitario: any; subtotal: number }[] = []
 
       for (const detalle of dto.detalles) {
-        const producto = await tx.producto.findUnique({
-          where: { id: detalle.productoId },
-        })
-
+        const producto = await tx.producto.findUnique({ where: { id: detalle.productoId } })
         const subtotal = Number(producto!.precio) * detalle.cantidad
-        total += subtotal
+        totalBruto += subtotal
 
         detallesData.push({
           productoId: detalle.productoId,
@@ -49,16 +37,35 @@ export class VentasService {
           subtotal,
         })
 
-        // Descontar stock
+        const stockAntes = producto!.stock
+        const stockDespues = stockAntes - detalle.cantidad
+
         await tx.producto.update({
           where: { id: detalle.productoId },
           data: { stock: { decrement: detalle.cantidad } },
         })
+
+        await tx.movimientoStock.create({
+          data: {
+            productoId: detalle.productoId,
+            tipo: 'SALIDA',
+            cantidad: detalle.cantidad,
+            stockAntes,
+            stockDespues,
+            motivo: 'VENTA',
+            usuarioId,
+          },
+        })
       }
+
+      const descuentoMonto = Math.round(totalBruto * descPct) / 100
+      const total = Math.round((totalBruto - descuentoMonto) * 100) / 100
 
       return tx.venta.create({
         data: {
           total,
+          descuentoPct: descPct,
+          formaPago,
           usuarioId,
           clienteId: dto.clienteId,
           detalles: { create: detallesData },
@@ -69,6 +76,12 @@ export class VentasService {
           usuario: { select: { id: true, nombre: true } },
         },
       })
+    })
+
+    // Actualizar ventaId en movimientos recién creados
+    await this.prisma.movimientoStock.updateMany({
+      where: { ventaId: null, motivo: 'VENTA', usuarioId },
+      data: { ventaId: venta.id },
     })
 
     return venta
@@ -110,7 +123,6 @@ export class VentasService {
       fechaHasta = new Date(hoy + 'T23:59:59.999-05:00')
     }
     const where = { fecha: { gte: fechaDesde, lte: fechaHasta } }
-
     const ventas = await this.prisma.venta.findMany({
       where,
       include: {
@@ -120,7 +132,6 @@ export class VentasService {
       },
       orderBy: { fecha: 'desc' },
     })
-
     const total = ventas.reduce((sum, v) => sum + Number(v.total), 0)
     return { ventas, totalVentas: ventas.length, totalIngresos: total }
   }

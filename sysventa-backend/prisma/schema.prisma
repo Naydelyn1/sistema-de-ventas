@@ -13,17 +13,18 @@ enum Rol {
 }
 
 model Usuario {
-  id                Int       @id @default(autoincrement())
+  id                Int          @id @default(autoincrement())
   nombre            String
-  email             String    @unique
+  email             String       @unique
   password          String
-  rol               Rol       @default(CAJERO)
-  activo            Boolean   @default(true)
-  creadoEn          DateTime  @default(now())
+  rol               Rol          @default(CAJERO)
+  activo            Boolean      @default(true)
+  creadoEn          DateTime     @default(now())
   resetToken        String?
   resetTokenExpiry  DateTime?
   ventas            Venta[]
   compras           Compra[]
+  turnos            TurnoCaja[]
 }
 
 model Categoria {
@@ -33,23 +34,39 @@ model Categoria {
 }
 
 model Producto {
-  id              Int              @id @default(autoincrement())
-  nombre          String
-  descripcion     String?
-  precio          Decimal          @db.Decimal(10, 2)
-  stock           Int              @default(0)
-  stockMinimo     Int              @default(5)
-  activo          Boolean          @default(true)
-  categoriaId     Int
-  categoria       Categoria        @relation(fields: [categoriaId], references: [id])
-  creadoEn        DateTime         @default(now())
-  detallesVenta   DetalleVenta[]
-  detallesCompra  DetalleCompra[]
-  
+  id                Int                @id @default(autoincrement())
+  nombre            String
+  descripcion       String?
+  precio            Decimal            @db.Decimal(10, 2)
+  stock             Int                @default(0)
+  stockMinimo       Int                @default(5)
+  activo            Boolean            @default(true)
+  categoriaId       Int
+  categoria         Categoria          @relation(fields: [categoriaId], references: [id])
+  creadoEn          DateTime           @default(now())
+  detallesVenta     DetalleVenta[]
+  detallesCompra    DetalleCompra[]
+  movimientos       MovimientoStock[]
+
   // Campos solo para farmacia
-  lote            String?
-  fechaVencimiento DateTime?
+  lote              String?
+  fechaVencimiento  DateTime?
   registroSanitario String?
+}
+
+model MovimientoStock {
+  id           Int      @id @default(autoincrement())
+  productoId   Int
+  producto     Producto @relation(fields: [productoId], references: [id])
+  tipo         String   // ENTRADA | SALIDA
+  cantidad     Int
+  stockAntes   Int
+  stockDespues Int
+  motivo       String   // COMPRA | VENTA | AJUSTE
+  ventaId      Int?
+  compraId     Int?
+  fecha        DateTime @default(now())
+  usuarioId    Int?
 }
 
 model Cliente {
@@ -76,14 +93,21 @@ model Proveedor {
 }
 
 model Venta {
-  id         Int            @id @default(autoincrement())
-  fecha      DateTime       @default(now())
-  total      Decimal        @db.Decimal(10, 2)
-  usuarioId  Int
-  usuario    Usuario        @relation(fields: [usuarioId], references: [id])
-  clienteId  Int?
-  cliente    Cliente?       @relation(fields: [clienteId], references: [id])
-  detalles   DetalleVenta[]
+  id                Int            @id @default(autoincrement())
+  fecha             DateTime       @default(now())
+  total             Decimal        @db.Decimal(10, 2)
+  descuentoPct      Decimal        @default(0) @db.Decimal(5, 2)
+  formaPago         String         @default("EFECTIVO")
+  usuarioId         Int
+  usuario           Usuario        @relation(fields: [usuarioId], references: [id])
+  clienteId         Int?
+  cliente           Cliente?       @relation(fields: [clienteId], references: [id])
+  detalles          DetalleVenta[]
+  tipoComprobante   String?
+  serieComprobante  String?
+  numeroComprobante Int?
+  enlacePdf         String?
+  aceptadaSunat     Boolean?
 }
 
 model DetalleVenta {
@@ -98,14 +122,16 @@ model DetalleVenta {
 }
 
 model Compra {
-  id          Int             @id @default(autoincrement())
-  fecha       DateTime        @default(now())
-  total       Decimal         @db.Decimal(10, 2)
-  proveedorId Int?
-  proveedor   Proveedor?      @relation(fields: [proveedorId], references: [id])
-  usuarioId   Int?
-  usuario     Usuario?        @relation(fields: [usuarioId], references: [id])
-  detalles    DetalleCompra[]
+  id                Int             @id @default(autoincrement())
+  fecha             DateTime        @default(now())
+  total             Decimal         @db.Decimal(10, 2)
+  proveedorId       Int?
+  proveedor         Proveedor?      @relation(fields: [proveedorId], references: [id])
+  usuarioId         Int?
+  usuario           Usuario?        @relation(fields: [usuarioId], references: [id])
+  serieComprobante  String?
+  numeroComprobante String?
+  detalles          DetalleCompra[]
 }
 
 model DetalleCompra {
@@ -117,4 +143,18 @@ model DetalleCompra {
   cantidad      Int
   precioCompra  Decimal  @db.Decimal(10, 2)
   subtotal      Decimal  @db.Decimal(10, 2)
+}
+
+model TurnoCaja {
+  id             Int       @id @default(autoincrement())
+  usuarioId      Int
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  fechaApertura  DateTime  @default(now())
+  fechaCierre    DateTime?
+  montoInicial   Decimal   @db.Decimal(10, 2)
+  montoFinal     Decimal?  @db.Decimal(10, 2)
+  totalVentas    Decimal   @default(0) @db.Decimal(10, 2)
+  diferencia     Decimal?  @db.Decimal(10, 2)
+  estado         String    @default("ABIERTO")
+  observaciones  String?
 }

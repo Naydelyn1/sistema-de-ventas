@@ -28,6 +28,11 @@ export class ClientesController {
     return this.clientesService.buscarPorDni(dni)
   }
 
+  @Get('reniec/:dni')
+  consultarReniec(@Param('dni') dni: string) {
+    return this.clientesService.consultarReniec(dni)
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.clientesService.findOne(id)

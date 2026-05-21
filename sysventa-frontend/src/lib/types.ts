@@ -60,11 +60,33 @@ export interface Venta {
   id: number
   fecha: string
   total: number
+  descuentoPct?: number
+  formaPago?: string
   usuarioId: number
   clienteId?: number
   cliente?: Cliente
   usuario: { id: number; nombre: string }
   detalles: DetalleVenta[]
+  tipoComprobante?: string
+  serieComprobante?: string
+  numeroComprobante?: number
+  enlacePdf?: string
+  aceptadaSunat?: boolean
+}
+
+export interface MovimientoStock {
+  id: number
+  productoId: number
+  tipo: 'ENTRADA' | 'SALIDA'
+  cantidad: number
+  stockAntes: number
+  stockDespues: number
+  motivo: 'COMPRA' | 'VENTA' | 'AJUSTE'
+  ventaId?: number
+  compraId?: number
+  fecha: string
+  usuarioId?: number
+  producto?: { nombre: string; stock: number }
 }
 
 export interface DetalleCompra {
@@ -84,6 +106,8 @@ export interface Compra {
   proveedor: Proveedor
   usuarioId: number
   usuario: { id: number; nombre: string }
+  serieComprobante?: string
+  numeroComprobante?: string
   detalles?: DetalleCompra[]
 }
 
@@ -100,6 +124,27 @@ export interface ProductoMasVendido {
   producto: { id: number; nombre: string; precio: number }
   cantidadVendida: number
   totalGenerado: number
+}
+
+export interface TurnoCaja {
+  id: number
+  usuarioId: number
+  usuario: { id: number; nombre: string }
+  fechaApertura: string
+  fechaCierre?: string
+  montoInicial: number
+  montoFinal?: number
+  totalVentas: number
+  diferencia?: number
+  estado: 'ABIERTO' | 'CERRADO'
+  observaciones?: string
+  // campos calculados al vuelo
+  ventasPorFormaPago?: Record<string, number>
+  cantidadPorFormaPago?: Record<string, number>
+  totalVentasEfectivo?: number
+  cantidadVentas?: number
+  totalVentasTodas?: number
+  montoEsperado?: number
 }
 
 export interface AuthResponse {

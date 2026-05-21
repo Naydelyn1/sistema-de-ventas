@@ -37,10 +37,25 @@ export class ComprasService {
           subtotal,
         })
 
-        // Incrementar stock
+        const prodActual = await tx.producto.findUnique({ where: { id: detalle.productoId } })
+        const stockAntes = prodActual!.stock
+        const stockDespues = stockAntes + detalle.cantidad
+
         await tx.producto.update({
           where: { id: detalle.productoId },
           data: { stock: { increment: detalle.cantidad } },
+        })
+
+        await tx.movimientoStock.create({
+          data: {
+            productoId: detalle.productoId,
+            tipo: 'ENTRADA',
+            cantidad: detalle.cantidad,
+            stockAntes,
+            stockDespues,
+            motivo: 'COMPRA',
+            usuarioId,
+          },
         })
       }
 
@@ -49,6 +64,8 @@ export class ComprasService {
           total,
           proveedorId: dto.proveedorId ?? null,
           usuarioId,
+          serieComprobante: dto.serieComprobante ?? null,
+          numeroComprobante: dto.numeroComprobante ?? null,
           detalles: { create: detallesData },
         },
         include: {
@@ -57,6 +74,11 @@ export class ComprasService {
           usuario: { select: { id: true, nombre: true } },
         },
       })
+    })
+
+    await this.prisma.movimientoStock.updateMany({
+      where: { compraId: null, motivo: 'COMPRA', usuarioId },
+      data: { compraId: compra.id },
     })
 
     return compra
