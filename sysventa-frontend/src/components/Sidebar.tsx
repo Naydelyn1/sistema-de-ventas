@@ -15,6 +15,9 @@ const navItems = [
   { href: '/categorias', icon: Tag, label: 'Categorias' },
   { href: '/clientes', icon: Users, label: 'Clientes' },
   { href: '/proveedores', icon: Truck, label: 'Proveedores' },
+]
+
+const ventasItems = [
   { href: '/ventas', icon: ShoppingCart, label: 'Ventas' },
 ]
 
@@ -69,6 +72,28 @@ export default function Sidebar() {
               {label}
             </Link>
           ))}
+
+          {(usuario?.rol === 'ADMIN' || usuario?.rol === 'CAJERO') && (
+            <>
+              <p className="px-3 pt-4 pb-1 text-blue-400 text-xs uppercase tracking-wider font-semibold">
+                Ventas
+              </p>
+              {ventasItems.map(({ href, icon: Icon, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(href)
+                      ? 'bg-blue-700 text-white'
+                      : 'text-blue-200 hover:bg-blue-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {label}
+                </Link>
+              ))}
+            </>
+          )}
 
           {(usuario?.rol === 'ADMIN' || usuario?.rol === 'ALMACENERO') && (
             <>

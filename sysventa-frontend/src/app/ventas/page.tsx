@@ -1,7 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
+import { getUsuario } from '@/lib/auth'
 import { Venta, Producto, Cliente, Categoria } from '@/lib/types'
 import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -127,6 +129,13 @@ function YapeQrStep({
 }
 
 export default function VentasPage() {
+  const router = useRouter()
+  const usuario = getUsuario()
+
+  useEffect(() => {
+    if (usuario?.rol === 'ALMACENERO') router.replace('/productos')
+  }, [])
+
   const [ventas, setVentas] = useState<Venta[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])

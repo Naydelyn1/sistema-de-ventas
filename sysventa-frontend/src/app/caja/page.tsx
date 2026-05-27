@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
 import { TurnoCaja } from '@/lib/types'
@@ -24,6 +25,13 @@ const FORMAS_CONFIG: Record<string, { label: string; emoji: string; color: strin
 }
 
 export default function CajaPage() {
+  const router = useRouter()
+  const usuario = getUsuario()
+
+  useEffect(() => {
+    if (usuario?.rol === 'ALMACENERO') router.replace('/productos')
+  }, [])
+
   const [turnoActual, setTurnoActual] = useState<TurnoCaja | null | undefined>(undefined)
   const [historial, setHistorial] = useState<TurnoCaja[]>([])
   const [loadingActual, setLoadingActual] = useState(true)
@@ -33,7 +41,6 @@ export default function CajaPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showHistorial, setShowHistorial] = useState(false)
-  const usuario = getUsuario()
 
   const cargarActual = async () => {
     setLoadingActual(true)
