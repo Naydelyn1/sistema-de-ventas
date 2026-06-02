@@ -2,15 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service'
 
 const FORMAS_PAGO = ['EFECTIVO', 'YAPE_PLIN', 'TARJETA', 'TRANSFERENCIA'] as const
-type FormaPago = typeof FORMAS_PAGO[number]
 
 @Injectable()
 export class CajaService {
   constructor(private prisma: PrismaService) {}
 
-  private async ventasPorFormaPago(desde: Date) {
+  private async ventasPorFormaPago(desde: Date, usuarioId: number, hasta?: Date) {
     const ventas = await this.prisma.venta.findMany({
-      where: { fecha: { gte: desde } },
+      where: { fecha: { gte: desde, ...(hasta ? { lte: hasta } : {}) }, usuarioId },
       select: { total: true, formaPago: true },
     })
 
@@ -32,8 +31,8 @@ export class CajaService {
   }
 
   async abrirTurno(usuarioId: number, montoInicial: number) {
-    const abierto = await this.prisma.turnoCaja.findFirst({ where: { estado: 'ABIERTO' } })
-    if (abierto) throw new BadRequestException('Ya hay un turno abierto. Ciérralo antes de abrir uno nuevo.')
+    const abierto = await this.prisma.turnoCaja.findFirst({ where: { estado: 'ABIERTO', usuarioId } })
+    if (abierto) throw new BadRequestException('Ya tienes un turno abierto. Ciérralo antes de abrir uno nuevo.')
 
     return this.prisma.turnoCaja.create({
       data: { usuarioId, montoInicial, estado: 'ABIERTO' },
@@ -46,7 +45,7 @@ export class CajaService {
     if (!turno) throw new NotFoundException('Turno no encontrado')
     if (turno.estado === 'CERRADO') throw new BadRequestException('Este turno ya fue cerrado')
 
-    const { totales, totalGeneral } = await this.ventasPorFormaPago(turno.fechaApertura)
+    const { totales, totalGeneral } = await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId)
     const totalEfectivo = totales['EFECTIVO'] ?? 0
     const montoEsperado = Number(turno.montoInicial) + totalEfectivo
     const diferencia = montoFinal - montoEsperado
@@ -65,15 +64,15 @@ export class CajaService {
     })
   }
 
-  async turnoActual() {
+  async turnoActual(usuarioId: number) {
     const turno = await this.prisma.turnoCaja.findFirst({
-      where: { estado: 'ABIERTO' },
+      where: { estado: 'ABIERTO', usuarioId },
       include: { usuario: { select: { id: true, nombre: true } } },
       orderBy: { fechaApertura: 'desc' },
     })
     if (!turno) return null
 
-    const { totales, cantidades, totalGeneral, cantidad } = await this.ventasPorFormaPago(turno.fechaApertura)
+    const { totales, cantidades, totalGeneral, cantidad } = await this.ventasPorFormaPago(turno.fechaApertura, usuarioId)
     const totalEfectivo = totales['EFECTIVO'] ?? 0
 
     return {
@@ -87,11 +86,60 @@ export class CajaService {
     }
   }
 
-  async historial(limit = 20) {
-    return this.prisma.turnoCaja.findMany({
+  async turnosActivos() {
+    const turnos = await this.prisma.turnoCaja.findMany({
+      where: { estado: 'ABIERTO' },
+      include: { usuario: { select: { id: true, nombre: true } } },
+      orderBy: { fechaApertura: 'asc' },
+    })
+
+    return Promise.all(
+      turnos.map(async (turno) => {
+        const { totales, cantidades, totalGeneral, cantidad } = await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId)
+        const totalEfectivo = totales['EFECTIVO'] ?? 0
+        return {
+          ...turno,
+          ventasPorFormaPago: totales,
+          cantidadPorFormaPago: cantidades,
+          totalVentasEfectivo: totalEfectivo,
+          cantidadVentas: cantidad,
+          totalVentasTodas: totalGeneral,
+          montoEsperado: Number(turno.montoInicial) + totalEfectivo,
+        }
+      })
+    )
+  }
+
+  async historial(desde?: string, hasta?: string) {
+    const where: Record<string, unknown> = {}
+    if (desde || hasta) {
+      where.fechaApertura = {
+        ...(desde ? { gte: new Date(desde) } : {}),
+        ...(hasta ? { lte: new Date(hasta + 'T23:59:59') } : {}),
+      }
+    }
+    const turnos = await this.prisma.turnoCaja.findMany({
+      where,
       include: { usuario: { select: { id: true, nombre: true } } },
       orderBy: { fechaApertura: 'desc' },
-      take: limit,
     })
+
+    return Promise.all(
+      turnos.map(async (turno) => {
+        const hastaDate = turno.fechaCierre ?? undefined
+        const { totales, cantidades, totalGeneral, cantidad } =
+          await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId, hastaDate)
+        const totalEfectivo = totales['EFECTIVO'] ?? 0
+        return {
+          ...turno,
+          ventasPorFormaPago: totales,
+          cantidadPorFormaPago: cantidades,
+          totalVentasEfectivo: totalEfectivo,
+          cantidadVentas: cantidad,
+          totalVentasTodas: totalGeneral,
+          montoEsperado: Number(turno.montoInicial) + totalEfectivo,
+        }
+      }),
+    )
   }
 }

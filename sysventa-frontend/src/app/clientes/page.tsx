@@ -5,26 +5,19 @@ import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import api from '@/lib/axios'
 import { Cliente } from '@/lib/types'
-import { Plus, Search, X, Pencil, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
+import { Plus, Search, X, Pencil, ToggleLeft, ToggleRight, Loader2, Users, Building2, User } from 'lucide-react'
 import Pagination from '@/components/Pagination'
 
 interface ClienteForm {
   nombre: string
   dni: string
+  ruc: string
   telefono: string
   email: string
   direccion: string
 }
 
-const initialForm: ClienteForm = { nombre: '', dni: '', telefono: '', email: '', direccion: '' }
-
-const fields: { key: keyof ClienteForm; label: string; required: boolean; type: string }[] = [
-  { key: 'nombre', label: 'Nombre *', required: true, type: 'text' },
-  { key: 'dni', label: 'DNI', required: false, type: 'text' },
-  { key: 'telefono', label: 'Telefono', required: false, type: 'text' },
-  { key: 'email', label: 'Email', required: false, type: 'email' },
-  { key: 'direccion', label: 'Direccion', required: false, type: 'text' },
-]
+const initialForm: ClienteForm = { nombre: '', dni: '', ruc: '', telefono: '', email: '', direccion: '' }
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -37,6 +30,8 @@ export default function ClientesPage() {
   const [saving, setSaving] = useState(false)
   const [dniLoading, setDniLoading] = useState(false)
   const [dniError, setDniError] = useState('')
+  const [rucLoading, setRucLoading] = useState(false)
+  const [rucError, setRucError] = useState('')
   const [page, setPage] = useState(1)
   const { toast, showToast, closeToast } = useToast()
 
@@ -58,14 +53,18 @@ export default function ClientesPage() {
       const q = search.toLowerCase()
       return (
         c.nombre.toLowerCase().includes(q) ||
-        (c.dni ?? '').toLowerCase().includes(q) ||
+        (c.dni ?? '').includes(q) ||
+        (c.ruc ?? '').includes(q) ||
         (c.telefono ?? '').includes(q)
       )
     }
     return true
   })
 
-  const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm); setDniError('') }
+  const closeModal = () => {
+    setShowModal(false); setEditId(null); setForm(initialForm)
+    setDniError(''); setRucError('')
+  }
 
   const buscarDni = async () => {
     if (form.dni.length !== 8) return
@@ -75,12 +74,27 @@ export default function ClientesPage() {
       const res = await api.get(`/clientes/reniec/${form.dni}`)
       setForm((prev) => ({ ...prev, nombre: res.data.nombre }))
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         ?? 'No se pudo obtener datos del DNI'
       setDniError(msg)
     } finally {
       setDniLoading(false)
+    }
+  }
+
+  const buscarRuc = async () => {
+    if (form.ruc.length !== 11) return
+    setRucLoading(true)
+    setRucError('')
+    try {
+      const res = await api.get<{ razonSocial: string }>(`/facturacion/ruc/${form.ruc}`)
+      setForm((prev) => ({ ...prev, nombre: res.data.razonSocial }))
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'RUC no encontrado en SUNAT'
+      setRucError(msg)
+    } finally {
+      setRucLoading(false)
     }
   }
 
@@ -89,6 +103,7 @@ export default function ClientesPage() {
     setForm({
       nombre: c.nombre,
       dni: c.dni ?? '',
+      ruc: c.ruc ?? '',
       telefono: c.telefono ?? '',
       email: c.email ?? '',
       direccion: c.direccion ?? '',
@@ -99,12 +114,13 @@ export default function ClientesPage() {
   const buildBody = () => ({
     nombre: form.nombre,
     ...(form.dni && { dni: form.dni }),
+    ...(form.ruc && { ruc: form.ruc }),
     ...(form.telefono && { telefono: form.telefono }),
     ...(form.email && { email: form.email }),
     ...(form.direccion && { direccion: form.direccion }),
   })
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
@@ -145,8 +161,8 @@ export default function ClientesPage() {
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Buscar por nombre o DNI..."
-              className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Buscar por nombre, DNI o RUC..."
+              className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm w-60 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {search && (
               <button
@@ -183,6 +199,37 @@ export default function ClientesPage() {
           </button>
         </div>
 
+        {/* Tarjetas resumen */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-blue-100 p-3 rounded-lg">
+              <Users className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Activos</p>
+              <p className="text-2xl font-bold text-gray-800">{clientes.filter(c => c.activo).length}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <Building2 className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Empresas (RUC)</p>
+              <p className="text-2xl font-bold text-gray-800">{clientes.filter(c => c.activo && c.ruc).length}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-green-100 p-3 rounded-lg">
+              <User className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Personas (DNI)</p>
+              <p className="text-2xl font-bold text-gray-800">{clientes.filter(c => c.activo && c.dni).length}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex justify-center py-16">
@@ -193,7 +240,7 @@ export default function ClientesPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    {['Nombre', 'DNI', 'Telefono', 'Email', 'Direccion', 'Estado', 'Acciones'].map((h) => (
+                    {['Nombre', 'DNI', 'RUC', 'Telefono', 'Email', 'Direccion', 'Estado', 'Acciones'].map((h) => (
                       <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                         {h}
                       </th>
@@ -203,7 +250,7 @@ export default function ClientesPage() {
                 <tbody className="divide-y divide-gray-100">
                   {clientesFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                      <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
                         {search
                           ? `Sin resultados para "${search}"`
                           : filtro === 'inactivos'
@@ -216,6 +263,7 @@ export default function ClientesPage() {
                       <tr key={c.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-medium text-gray-800">{c.nombre}</td>
                         <td className="px-6 py-4 text-gray-500">{c.dni ?? '-'}</td>
+                        <td className="px-6 py-4 text-gray-500">{c.ruc ?? '-'}</td>
                         <td className="px-6 py-4 text-gray-500">{c.telefono ?? '-'}</td>
                         <td className="px-6 py-4 text-gray-500">{c.email ?? '-'}</td>
                         <td className="px-6 py-4 text-gray-500">{c.direccion ?? '-'}</td>
@@ -270,45 +318,100 @@ export default function ClientesPage() {
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {fields.map(({ key, label, required, type }) => (
-                  <div key={key}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                    {key === 'dni' ? (
-                      <>
-                        <div className="flex gap-2">
-                          <input
-                            required={required}
-                            type={type}
-                            maxLength={8}
-                            value={form.dni}
-                            onChange={(e) => { setForm({ ...form, dni: e.target.value }); setDniError('') }}
-                            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={buscarDni}
-                            disabled={dniLoading || form.dni.length !== 8}
-                            title="Buscar en RENIEC"
-                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm disabled:opacity-40 flex items-center"
-                          >
-                            {dniLoading
-                              ? <Loader2 className="w-4 h-4 animate-spin" />
-                              : <Search className="w-4 h-4" />}
-                          </button>
-                        </div>
-                        {dniError && <p className="text-xs text-red-500 mt-1">{dniError}</p>}
-                      </>
-                    ) : (
-                      <input
-                        required={required}
-                        type={type}
-                        value={form[key]}
-                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    )}
+
+                {/* Nombre */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                  <input
+                    required
+                    value={form.nombre}
+                    onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* DNI */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">DNI</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={form.dni}
+                      onChange={(e) => { setForm({ ...form, dni: e.target.value }); setDniError('') }}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={buscarDni}
+                      disabled={dniLoading || form.dni.length !== 8}
+                      title="Buscar en RENIEC"
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm disabled:opacity-40 flex items-center"
+                    >
+                      {dniLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    </button>
                   </div>
-                ))}
+                  {dniError && <p className="text-xs text-red-500 mt-1">{dniError}</p>}
+                </div>
+
+                {/* RUC */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    RUC <span className="text-xs text-gray-400 font-normal">(autocompleta razón social)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={11}
+                      value={form.ruc}
+                      onChange={(e) => { setForm({ ...form, ruc: e.target.value.replace(/\D/g, '') }); setRucError('') }}
+                      placeholder="20xxxxxxxxx"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={buscarRuc}
+                      disabled={rucLoading || form.ruc.length !== 11}
+                      title="Buscar en SUNAT"
+                      className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm disabled:opacity-40 flex items-center"
+                    >
+                      {rucLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {rucError && <p className="text-xs text-red-500 mt-1">{rucError}</p>}
+                </div>
+
+                {/* Telefono */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+                  <input
+                    value={form.telefono}
+                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Direccion */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Direccion</label>
+                  <input
+                    value={form.direccion}
+                    onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"

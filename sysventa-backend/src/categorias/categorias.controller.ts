@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common'
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, Query } from '@nestjs/common'
 import { CategoriasService } from './categorias.service'
 import { CrearCategoriaDto } from './dto/crear-categoria.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -17,13 +17,19 @@ export class CategoriasController {
   }
 
   @Get()
-  findAll() {
-    return this.categoriasService.findAll()
+  findAll(@Query('todos') todos?: string) {
+    return this.categoriasService.findAll(todos !== 'true')
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.categoriasService.findOne(id)
+  }
+
+  @Roles('ADMIN', 'ALMACENERO')
+  @Patch(':id/toggle')
+  toggleActivo(@Param('id', ParseIntPipe) id: number) {
+    return this.categoriasService.toggleActivo(id)
   }
 
   @Roles('ADMIN', 'ALMACENERO')

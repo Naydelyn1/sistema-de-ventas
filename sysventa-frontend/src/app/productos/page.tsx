@@ -5,7 +5,7 @@ import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import api from '@/lib/axios'
 import { Producto, Categoria } from '@/lib/types'
-import { Plus, AlertTriangle, ToggleLeft, ToggleRight, X, Pencil, Search } from 'lucide-react'
+import { Plus, AlertTriangle, ToggleLeft, ToggleRight, X, Pencil, Search, Package, ShieldAlert, Tag } from 'lucide-react'
 import Pagination from '@/components/Pagination'
 
 interface ProductoForm {
@@ -18,12 +18,13 @@ interface ProductoForm {
   lote: string
   fechaVencimiento: string
   registroSanitario: string
+  presentacion: string
 }
 
 const initialForm: ProductoForm = {
   nombre: '', descripcion: '', precio: '', stock: '',
   stockMinimo: '', categoriaId: '', lote: '',
-  fechaVencimiento: '', registroSanitario: '',
+  fechaVencimiento: '', registroSanitario: '', presentacion: '',
 }
 
 export default function ProductosPage() {
@@ -83,6 +84,7 @@ export default function ProductosPage() {
       lote: p.lote ?? '',
       fechaVencimiento: p.fechaVencimiento ? p.fechaVencimiento.split('T')[0] : '',
       registroSanitario: p.registroSanitario ?? '',
+      presentacion: p.presentacion ?? '',
     })
     setShowModal(true)
   }
@@ -103,6 +105,7 @@ export default function ProductosPage() {
         ? new Date(form.fechaVencimiento).toISOString()
         : undefined,
       registroSanitario: form.registroSanitario || undefined,
+      presentacion: form.presentacion || undefined,
     }
     try {
       if (editId) {
@@ -181,6 +184,37 @@ export default function ProductosPage() {
           </button>
         </div>
 
+        {/* Tarjetas resumen */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-blue-100 p-3 rounded-lg">
+              <Package className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Activos</p>
+              <p className="text-2xl font-bold text-gray-800">{productos.filter(p => p.activo).length}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-red-100 p-3 rounded-lg">
+              <ShieldAlert className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Stock bajo</p>
+              <p className="text-2xl font-bold text-gray-800">{productos.filter(p => p.activo && p.stock <= p.stockMinimo).length}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <Tag className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Categorías</p>
+              <p className="text-2xl font-bold text-gray-800">{new Set(productos.map(p => p.categoriaId)).size}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex justify-center py-16">
@@ -217,7 +251,7 @@ export default function ProductosPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-800">{p.nombre}</span>
                             {p.stock <= p.stockMinimo && (
-                              <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" title="Stock bajo" />
+                              <span title="Stock bajo"><AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" /></span>
                             )}
                           </div>
                         </td>
@@ -348,6 +382,26 @@ export default function ProductosPage() {
                     onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Presentación</label>
+                  <select
+                    value={form.presentacion}
+                    onChange={(e) => setForm({ ...form, presentacion: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="UNIDAD">Unidad</option>
+                    <option value="CAJA">Caja</option>
+                    <option value="BLISTER">Blister</option>
+                    <option value="FRASCO">Frasco</option>
+                    <option value="AMPOLLA">Ampolla</option>
+                    <option value="TUBO">Tubo</option>
+                    <option value="LATA">Lata</option>
+                    <option value="VIDRIO">Vidrio</option>
+                    <option value="BOLSA">Bolsa</option>
+                    <option value="SOBRE">Sobre</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Lote</label>

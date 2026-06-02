@@ -10,6 +10,10 @@ export class CrearClienteDto {
 
   @IsOptional()
   @IsString()
+  ruc?: string
+
+  @IsOptional()
+  @IsString()
   telefono?: string
 
   @IsOptional()

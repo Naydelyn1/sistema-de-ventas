@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
 import { Compra, Producto, Proveedor } from '@/lib/types'
-import { Plus, Trash2, Package } from 'lucide-react'
+import { Plus, Trash2, Package, History, Search, X } from 'lucide-react'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import Pagination from '@/components/Pagination'
@@ -34,6 +34,8 @@ export default function ComprasPage() {
   const [page, setPage] = useState(1)
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
+  const [tab, setTab] = useState<'compra' | 'historial'>('compra')
+  const [busquedaProveedor, setBusquedaProveedor] = useState('')
   const { toast, showToast, closeToast } = useToast()
 
   const loadData = async () => {
@@ -88,7 +90,13 @@ export default function ComprasPage() {
 
   const total = carrito.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0)
 
-  const comprasPag = compras.slice((page - 1) * 15, page * 15)
+  const comprasFiltradas = busquedaProveedor
+    ? compras.filter((c) =>
+        c.proveedor?.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()) ||
+        c.proveedor?.ruc?.includes(busquedaProveedor)
+      )
+    : compras
+  const comprasPag = comprasFiltradas.slice((page - 1) * 15, page * 15)
 
   const handleRegistrarCompra = async () => {
     if (carrito.length === 0) { setError('Agrega productos al carrito'); return }
@@ -122,10 +130,32 @@ export default function ComprasPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
+
+        {/* Pestañas */}
+        <div className="flex gap-1 bg-white rounded-xl shadow-sm p-1 w-fit">
+          <button
+            onClick={() => setTab('compra')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'compra' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Nueva Compra
+          </button>
+          <button
+            onClick={() => { setTab('historial'); buscarCompras() }}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'historial' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            Historial
+          </button>
+        </div>
 
         {/* Nueva Compra — horizontal top panel */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {tab === 'compra' && <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
             <Package className="w-5 h-5 text-purple-600" />
             <h3 className="font-semibold text-gray-800">Nueva Compra</h3>
@@ -181,41 +211,46 @@ export default function ComprasPage() {
             <div className="p-4">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Producto</p>
               <div className="space-y-2">
-                <select
+                <SearchableSelect
                   value={productoSelId}
-                  onChange={(e) => setProductoSelId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Seleccionar producto...</option>
-                  {productos.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre} (stock: {p.stock})
-                    </option>
-                  ))}
-                </select>
-                <div className="flex gap-2 min-w-0">
+                  onChange={setProductoSelId}
+                  options={[...productos].sort((a, b) => a.stock - b.stock).map((p) => ({ value: String(p.id), label: `${p.nombre} (stock: ${p.stock})` }))}
+                  placeholder="Seleccionar producto..."
+                />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Precio unitario <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white">
+                    <span className="pl-3 pr-2 text-sm font-semibold text-purple-600 select-none shrink-0">S/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={precioUnitario}
+                      onChange={(e) => setPrecioUnitario(e.target.value)}
+                      className="flex-1 min-w-0 pr-3 py-2 text-sm text-gray-900 bg-white focus:outline-none rounded-r-lg"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
                   <input
-                    inputMode="decimal"
-                    placeholder="Precio unit."
-                    value={precioUnitario}
-                    onChange={(e) => setPrecioUnitario(e.target.value)}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <input
-                    inputMode="numeric"
-                    placeholder="Cant."
+                    type="number"
+                    min="1"
                     value={cantidad}
                     onChange={(e) => setCantidad(e.target.value)}
-                    className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
-                  <button
-                    onClick={agregarAlCarrito}
-                    disabled={!productoSelId || !precioUnitario}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg disabled:opacity-40 flex items-center gap-1 text-sm font-medium shrink-0"
-                  >
-                    <Plus className="w-4 h-4" /> Agregar
-                  </button>
                 </div>
+                <button
+                  onClick={agregarAlCarrito}
+                  disabled={!productoSelId || !precioUnitario}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg disabled:opacity-40 flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  <Plus className="w-4 h-4" /> Agregar al carrito
+                </button>
               </div>
             </div>
 
@@ -254,7 +289,7 @@ export default function ComprasPage() {
             <div className="p-4 flex flex-col justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Total</p>
-                <p className="text-3xl font-bold text-purple-700 mb-1">S/ {(Number(total) || 0).toFixed(2)}</p>
+                <p className="text-2xl font-bold text-purple-700 mb-1 break-all">S/ {(Number(total) || 0).toFixed(2)}</p>
                 {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
               </div>
               <button
@@ -267,12 +302,31 @@ export default function ComprasPage() {
             </div>
 
           </div>
-        </div>
+        </div>}
 
         {/* Historial de Compras */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {tab === 'historial' && <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 space-y-3">
-            <h3 className="font-semibold text-gray-800">Historial de Compras</h3>
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="font-semibold text-gray-800">Historial de Compras</h3>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  value={busquedaProveedor}
+                  onChange={(e) => { setBusquedaProveedor(e.target.value); setPage(1) }}
+                  placeholder="Buscar por proveedor..."
+                  className="pl-9 pr-8 py-1.5 border border-gray-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                {busquedaProveedor && (
+                  <button
+                    onClick={() => { setBusquedaProveedor(''); setPage(1) }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="flex flex-wrap items-end gap-2">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Desde</label>
@@ -307,11 +361,11 @@ export default function ComprasPage() {
                   Limpiar
                 </button>
               )}
-              {compras.length > 0 && (
+              {comprasFiltradas.length > 0 && (
                 <span className="text-xs text-gray-500 ml-auto self-end">
-                  {compras.length} compra{compras.length !== 1 ? 's' : ''} —{' '}
+                  {comprasFiltradas.length} compra{comprasFiltradas.length !== 1 ? 's' : ''} —{' '}
                   <span className="font-semibold text-purple-700">
-                    S/ {compras.reduce((s, c) => s + (Number(c.total) || 0), 0).toFixed(2)}
+                    S/ {comprasFiltradas.reduce((s, c) => s + (Number(c.total) || 0), 0).toFixed(2)}
                   </span>
                 </span>
               )}
@@ -325,8 +379,10 @@ export default function ComprasPage() {
             <div className="flex justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent" />
             </div>
-          ) : compras.length === 0 ? (
-            <p className="text-center text-gray-400 py-12 text-sm">No hay compras registradas</p>
+          ) : comprasFiltradas.length === 0 ? (
+            <p className="text-center text-gray-400 py-12 text-sm">
+              {busquedaProveedor ? `Sin resultados para "${busquedaProveedor}"` : 'No hay compras registradas'}
+            </p>
           ) : (
             <>
               <div className="divide-y divide-gray-100">
@@ -362,10 +418,11 @@ export default function ComprasPage() {
                   </div>
                 ))}
               </div>
-              <Pagination total={compras.length} page={page} pageSize={15} onChange={setPage} />
+              <Pagination total={comprasFiltradas.length} page={page} pageSize={15} onChange={setPage} />
             </>
           )}
-        </div>
+        </div>}
+
       </div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
     </DashboardLayout>

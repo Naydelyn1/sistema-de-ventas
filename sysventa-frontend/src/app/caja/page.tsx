@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
 import { TurnoCaja } from '@/lib/types'
-import { DollarSign, Lock, Unlock, Clock, CheckCircle, AlertTriangle, History, CreditCard, Smartphone, ArrowLeftRight } from 'lucide-react'
+import { DollarSign, Lock, Unlock, Clock, CheckCircle, AlertTriangle, History, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import { getUsuario } from '@/lib/auth'
 
 const fmt = (n: number) =>
@@ -34,13 +34,21 @@ export default function CajaPage() {
 
   const [turnoActual, setTurnoActual] = useState<TurnoCaja | null | undefined>(undefined)
   const [historial, setHistorial] = useState<TurnoCaja[]>([])
+  const [cajasActivas, setCajasActivas] = useState<TurnoCaja[]>([])
   const [loadingActual, setLoadingActual] = useState(true)
+  const [loadingCajas, setLoadingCajas] = useState(false)
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
+  const [expandedCaja, setExpandedCaja] = useState<number | null>(null)
+  const [tab, setTab] = useState<'caja' | 'historial'>('caja')
+  const today = new Date().toISOString().split('T')[0]
+  const [desde, setDesde] = useState(today)
+  const [hasta, setHasta] = useState(today)
   const [montoInicial, setMontoInicial] = useState('')
   const [montoFinal, setMontoFinal] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [showHistorial, setShowHistorial] = useState(false)
+  const [expandedHistorial, setExpandedHistorial] = useState<number | null>(null)
 
   const cargarActual = async () => {
     setLoadingActual(true)
@@ -52,14 +60,32 @@ export default function CajaPage() {
     }
   }
 
-  const cargarHistorial = async () => {
-    const res = await api.get<TurnoCaja[]>('/caja/historial')
-    setHistorial(res.data)
+  const cargarHistorial = async (d = desde, h = hasta) => {
+    setLoadingHistorial(true)
+    try {
+      const params = new URLSearchParams()
+      if (d) params.set('desde', d)
+      if (h) params.set('hasta', h)
+      const res = await api.get<TurnoCaja[]>(`/caja/historial?${params}`)
+      setHistorial(res.data)
+    } finally {
+      setLoadingHistorial(false)
+    }
+  }
+
+  const cargarCajasActivas = async () => {
+    setLoadingCajas(true)
+    try {
+      const res = await api.get<TurnoCaja[]>('/caja/activas')
+      setCajasActivas(res.data)
+    } finally {
+      setLoadingCajas(false)
+    }
   }
 
   useEffect(() => {
     cargarActual()
-    if (usuario?.rol === 'ADMIN') cargarHistorial()
+    if (usuario?.rol === 'ADMIN') cargarCajasActivas()
   }, [])
 
   const handleAbrir = async () => {
@@ -101,20 +127,39 @@ export default function CajaPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Cuadre de Caja</h2>
             <p className="text-sm text-gray-400 mt-0.5">Control de turnos y medios de pago</p>
           </div>
-          {usuario?.rol === 'ADMIN' && (
-            <button onClick={() => setShowHistorial(!showHistorial)}
-              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-              <History className="w-4 h-4" />
-              {showHistorial ? 'Ocultar historial' : 'Ver historial'}
-            </button>
-          )}
         </div>
+
+        {/* Pestañas — solo admin */}
+        {usuario?.rol === 'ADMIN' && (
+          <div className="flex gap-1 bg-white rounded-xl shadow-sm p-1 w-fit">
+            <button
+              onClick={() => setTab('caja')}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tab === 'caja' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <DollarSign className="w-4 h-4" />
+              Mi Caja
+            </button>
+            <button
+              onClick={() => { setTab('historial'); cargarHistorial() }}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tab === 'historial' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              Historial
+            </button>
+          </div>
+        )}
+
+        {(tab === 'caja' || usuario?.rol !== 'ADMIN') && <>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 flex items-center gap-2">
@@ -325,64 +370,244 @@ export default function CajaPage() {
           </div>
         )}
 
-        {/* Historial */}
-        {showHistorial && historial.length > 0 && (
+        {/* Cajas Activas — solo admin */}
+        {usuario?.rol === 'ADMIN' && (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Unlock className="w-4 h-4 text-green-600" />
+                Cajas activas ahora
+                {cajasActivas.length > 0 && (
+                  <span className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                    {cajasActivas.length}
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={cargarCajasActivas}
+                disabled={loadingCajas}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingCajas ? 'animate-spin' : ''}`} />
+                Actualizar
+              </button>
+            </div>
+
+            {loadingCajas ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-7 w-7 border-4 border-green-600 border-t-transparent" />
+              </div>
+            ) : cajasActivas.length === 0 ? (
+              <p className="text-center text-gray-400 py-10 text-sm">No hay cajas abiertas en este momento</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {cajasActivas.map((caja) => {
+                  const formasConVentas = caja.ventasPorFormaPago
+                    ? Object.entries(caja.ventasPorFormaPago).filter(([, v]) => v > 0)
+                    : []
+                  const isOpen = expandedCaja === caja.id
+
+                  return (
+                    <div key={caja.id}>
+                      {/* Fila resumen — clickeable */}
+                      <button
+                        onClick={() => setExpandedCaja(isOpen ? null : caja.id)}
+                        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left"
+                      >
+                        <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
+                          <Unlock className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800">{caja.usuario.nombre}</p>
+                          <p className="text-xs text-gray-400">Apertura: {fmtDate(caja.fechaApertura)}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-bold text-green-700">{fmt(caja.totalVentasTodas ?? 0)}</p>
+                          <p className="text-xs text-gray-400">{caja.cantidadVentas ?? 0} ventas</p>
+                        </div>
+                        {isOpen
+                          ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+                          : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                        }
+                      </button>
+
+                      {/* Detalle expandible */}
+                      {isOpen && (
+                        <div className="px-5 pb-5 bg-gray-50 border-t border-gray-100">
+                          <div className="grid grid-cols-2 gap-3 pt-4 mb-3">
+                            <div className="bg-white rounded-xl p-3 border border-gray-200">
+                              <p className="text-xs text-gray-500 mb-1">Monto inicial</p>
+                              <p className="text-lg font-bold text-gray-800">{fmt(Number(caja.montoInicial))}</p>
+                            </div>
+                            <div className="bg-green-50 rounded-xl p-3 border border-green-100">
+                              <p className="text-xs text-green-600 mb-1">Efectivo esperado</p>
+                              <p className="text-lg font-bold text-green-700">{fmt(caja.montoEsperado ?? 0)}</p>
+                            </div>
+                          </div>
+
+                          {formasConVentas.length > 0 ? (
+                            <div className={`grid gap-2 ${formasConVentas.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
+                              {formasConVentas.map(([fp, total]) => {
+                                const cfg = FORMAS_CONFIG[fp] ?? { label: fp, emoji: '💰', color: 'bg-gray-50', text: 'text-gray-700', sub: 'text-gray-400' }
+                                const cant = caja.cantidadPorFormaPago?.[fp] ?? 0
+                                return (
+                                  <div key={fp} className={`${cfg.color} rounded-xl p-3 border border-gray-100`}>
+                                    <p className={`text-xs font-medium mb-1 ${cfg.sub}`}>{cfg.emoji} {cfg.label}</p>
+                                    <p className={`text-base font-bold ${cfg.text}`}>{fmt(total)}</p>
+                                    <p className={`text-xs mt-0.5 ${cfg.sub}`}>{cant} venta{cant !== 1 ? 's' : ''}</p>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400 text-center py-3">Sin ventas en este turno</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        </>}
+
+        {/* Historial — solo admin */}
+        {tab === 'historial' && usuario?.rol === 'ADMIN' && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 space-y-3">
               <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-gray-500" />
                 Historial de turnos
               </h3>
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Desde</label>
+                  <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                  <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <button onClick={() => cargarHistorial()} disabled={loadingHistorial}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50">
+                  {loadingHistorial ? 'Buscando...' : 'Buscar'}
+                </button>
+                {(desde !== today || hasta !== today) && (
+                  <button onClick={() => { setDesde(today); setHasta(today); cargarHistorial(today, today) }}
+                    className="text-sm text-gray-400 hover:text-gray-600 px-2 py-1.5">
+                    Hoy
+                  </button>
+                )}
+                {historial.length > 0 && (
+                  <span className="text-xs text-gray-400 ml-auto self-end">
+                    {historial.length} turno{historial.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
             </div>
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Apertura</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Cierre</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Cajero</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Inicial</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total ventas</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Efectivo final</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Diferencia</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {historial.map((t) => {
-                  const dif = Number(t.diferencia ?? 0)
-                  return (
-                    <tr key={t.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{fmtDate(t.fechaApertura)}</td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
-                        {t.fechaCierre ? fmtDate(t.fechaCierre) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">{t.usuario.nombre}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{fmt(Number(t.montoInicial))}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{fmt(Number(t.totalVentas))}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {t.montoFinal != null ? fmt(Number(t.montoFinal)) : '—'}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-medium ${
-                        dif > 0.01 ? 'text-blue-600' : dif < -0.01 ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {t.diferencia != null ? (dif >= 0 ? '+' : '') + fmt(dif) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {t.estado === 'ABIERTO' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                            <Unlock className="w-3 h-3" />ABIERTO
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">
-                            <CheckCircle className="w-3 h-3" />CERRADO
-                          </span>
-                        )}
-                      </td>
+
+            {loadingHistorial ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent" />
+              </div>
+            ) : historial.length === 0 ? (
+              <p className="text-center text-gray-400 py-12 text-sm">No hay turnos en ese rango de fechas</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      {['Apertura','Cierre','Cajero','Inicial','Total ventas','Total turno','Efectivo final','Diferencia','Estado',''].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  {historial.map((t) => {
+                    const dif = Number(t.diferencia ?? 0)
+                    const isOpen = expandedHistorial === t.id
+                    const formas = t.ventasPorFormaPago
+                      ? Object.entries(t.ventasPorFormaPago).filter(([, v]) => v > 0)
+                      : []
+                    return (
+                      <tbody key={t.id} className="divide-y divide-gray-100">
+                        <tr
+                          className={`hover:bg-gray-50 cursor-pointer ${isOpen ? 'bg-blue-50' : ''}`}
+                          onClick={() => setExpandedHistorial(isOpen ? null : t.id)}
+                        >
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{fmtDate(t.fechaApertura)}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{t.fechaCierre ? fmtDate(t.fechaCierre) : '—'}</td>
+                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{t.usuario.nombre}</td>
+                          <td className="px-4 py-3 text-right text-gray-700">{fmt(Number(t.montoInicial))}</td>
+                          <td className="px-4 py-3 text-right text-gray-700">
+                            {fmt(t.totalVentasTodas ?? Number(t.totalVentas))}
+                            {formas.length > 1 && (
+                              <div className="text-xs font-normal text-gray-400 mt-0.5">
+                                {formas.map(([fp]) => FORMAS_CONFIG[fp]?.emoji ?? '💰').join(' + ')}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                            {fmt(Number(t.montoInicial) + (t.totalVentasTodas ?? Number(t.totalVentas)))}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-700">{t.montoFinal != null ? fmt(Number(t.montoFinal)) : '—'}</td>
+                          <td className={`px-4 py-3 text-right font-medium ${dif > 0.01 ? 'text-blue-600' : dif < -0.01 ? 'text-red-600' : 'text-green-600'}`}>
+                            {t.diferencia != null ? (dif >= 0 ? '+' : '') + fmt(dif) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {t.estado === 'ABIERTO' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                                <Unlock className="w-3 h-3" />ABIERTO
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">
+                                <CheckCircle className="w-3 h-3" />CERRADO
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-400">
+                            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="bg-blue-50">
+                            <td colSpan={10} className="px-6 pb-4 pt-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Desglose por forma de pago</p>
+                              {formas.length === 0 ? (
+                                <p className="text-xs text-gray-400">Sin ventas en este turno</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-2 items-end">
+                                  {formas.map(([fp, total]) => {
+                                    const cfg = FORMAS_CONFIG[fp] ?? { label: fp, emoji: '💰', color: 'bg-gray-50', text: 'text-gray-700', sub: 'text-gray-400' }
+                                    const cant = t.cantidadPorFormaPago?.[fp] ?? 0
+                                    return (
+                                      <div key={fp} className={`${cfg.color} rounded-lg px-3 py-2 border border-gray-100`}>
+                                        <p className={`text-xs font-medium ${cfg.sub}`}>{cfg.emoji} {cfg.label}</p>
+                                        <p className={`text-sm font-bold ${cfg.text}`}>{fmt(total)}</p>
+                                        <p className={`text-xs ${cfg.sub}`}>{cant} venta{cant !== 1 ? 's' : ''}</p>
+                                      </div>
+                                    )
+                                  })}
+                                  <div className="bg-gray-800 rounded-lg px-3 py-2 ml-2">
+                                    <p className="text-xs font-medium text-gray-300">Total cobrado</p>
+                                    <p className="text-sm font-bold text-white">{fmt(t.totalVentasTodas ?? 0)}</p>
+                                    <p className="text-xs text-gray-400">{t.cantidadVentas ?? 0} ventas</p>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    )
+                  })}
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

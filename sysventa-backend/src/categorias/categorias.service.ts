@@ -15,11 +15,22 @@ export class CategoriasService {
     return this.prisma.categoria.create({ data: dto })
   }
 
-  async findAll() {
+  async findAll(soloActivas = true) {
     return this.prisma.categoria.findMany({
+      where: soloActivas ? { activo: true } : undefined,
       orderBy: { nombre: 'asc' },
       include: { _count: { select: { productos: true } } },
     })
+  }
+
+  async toggleActivo(id: number) {
+    const categoria = await this.findOne(id)
+    const nuevoEstado = !categoria.activo
+    await this.prisma.producto.updateMany({
+      where: { categoriaId: id },
+      data: { activo: nuevoEstado },
+    })
+    return this.prisma.categoria.update({ where: { id }, data: { activo: nuevoEstado } })
   }
 
   async findOne(id: number) {

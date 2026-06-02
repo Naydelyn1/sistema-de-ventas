@@ -5,11 +5,12 @@ import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
 import { getUsuario } from '@/lib/auth'
 import { Venta, Producto, Cliente, Categoria } from '@/lib/types'
-import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle, History } from 'lucide-react'
 import Link from 'next/link'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import Pagination from '@/components/Pagination'
+import SearchableSelect from '@/components/SearchableSelect'
 import QRCode from 'react-qr-code'
 import { generarQRPago } from '@/lib/qr-pago'
 import Image from 'next/image'
@@ -186,6 +187,7 @@ export default function VentasPage() {
   const today = new Date().toISOString().split('T')[0]
   const [desde, setDesde] = useState(today)
   const [hasta, setHasta] = useState(today)
+  const [tab, setTab] = useState<'venta' | 'historial'>('venta')
   const { toast, showToast, closeToast } = useToast()
 
   const loadData = async () => {
@@ -227,20 +229,31 @@ export default function VentasPage() {
   }
 
   const buscarClientePorDni = async () => {
-    const dni = dniInput.trim()
-    if (dni.length !== 8) { setDniError('El DNI debe tener 8 dígitos'); return }
+    const input = dniInput.trim()
+    if (input.length !== 8 && input.length !== 11) {
+      setDniError('Ingresa 8 dígitos (DNI) o 11 dígitos (RUC)')
+      return
+    }
     setDniLoading(true)
     setDniError('')
     setClienteReniec(null)
     try {
-      const localRes = await api.get<Cliente | null>(`/clientes/buscar?dni=${dni}`)
+      if (input.length === 11) {
+        // Búsqueda por RUC
+        const localRes = await api.get<Cliente | null>(`/clientes/buscar?ruc=${input}`)
+        if (localRes.data) { setClienteSeleccionado(localRes.data); setDniInput(''); return }
+        setDniError('No hay cliente con ese RUC registrado. Regístralo primero en Clientes.')
+        return
+      }
+      // Búsqueda por DNI
+      const localRes = await api.get<Cliente | null>(`/clientes/buscar?dni=${input}`)
       if (localRes.data) { setClienteSeleccionado(localRes.data); setDniInput(''); return }
-      const reniecRes = await api.get<ClienteReniec>(`/clientes/reniec/${dni}`)
-      setClienteReniec({ ...reniecRes.data, numeroDocumento: dni })
+      const reniecRes = await api.get<ClienteReniec>(`/clientes/reniec/${input}`)
+      setClienteReniec({ ...reniecRes.data, numeroDocumento: input })
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setDniError(status === 404 ? (msg ?? 'DNI no encontrado en RENIEC') : (msg ?? 'Error al consultar el DNI'))
+      setDniError(status === 404 ? (msg ?? 'No encontrado') : (msg ?? 'Error al consultar'))
     } finally {
       setDniLoading(false)
     }
@@ -307,11 +320,20 @@ export default function VentasPage() {
     setBoletaDni(clienteSeleccionado?.dni ?? '')
     setBoletaNombre(clienteSeleccionado?.nombre ?? '')
     setBoletaDniError('')
-    setFacturaRuc('')
-    setFacturaRazonSocial('')
+    setFacturaRuc(clienteSeleccionado?.ruc ?? '')
+    setFacturaRazonSocial(clienteSeleccionado?.ruc ? clienteSeleccionado.nombre : '')
     setFacturaRucError('')
     setComprobanteResult(null)
-    setModalStep(formaPago === 'YAPE_PLIN' ? 'qr' : 'choose')
+
+    let step: ModalStep = 'choose'
+    if (formaPago === 'YAPE_PLIN') {
+      step = 'qr'
+    } else if (clienteSeleccionado?.ruc) {
+      step = 'factura'
+    } else if (clienteSeleccionado?.dni) {
+      step = 'boleta'
+    }
+    setModalStep(step)
     setShowModalVenta(true)
   }
 
@@ -464,10 +486,32 @@ export default function VentasPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
 
-        {/* Aviso turno cerrado */}
-        {turnoAbierto === false && (
+        {/* Pestañas */}
+        <div className="flex gap-1 bg-white rounded-xl shadow-sm p-1 w-fit">
+          <button
+            onClick={() => setTab('venta')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'venta' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Nueva Venta
+          </button>
+          <button
+            onClick={() => { setTab('historial'); buscarVentas() }}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'historial' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            Historial
+          </button>
+        </div>
+
+        {/* Aviso turno cerrado — solo en tab venta */}
+        {tab === 'venta' && turnoAbierto === false && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
@@ -484,6 +528,7 @@ export default function VentasPage() {
         )}
 
         {/* Nueva Venta — horizontal top panel */}
+        {tab === 'venta' && <>
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
             <ShoppingCart className="w-5 h-5 text-blue-600" />
@@ -500,7 +545,8 @@ export default function VentasPage() {
                     <UserCheck className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium text-gray-800 leading-tight">{clienteSeleccionado.nombre}</p>
-                      {clienteSeleccionado.dni && <p className="text-xs text-gray-500">DNI: {clienteSeleccionado.dni}</p>}
+                      {clienteSeleccionado.ruc && <p className="text-xs text-purple-600 font-medium">RUC: {clienteSeleccionado.ruc}</p>}
+                      {clienteSeleccionado.dni && !clienteSeleccionado.ruc && <p className="text-xs text-gray-500">DNI: {clienteSeleccionado.dni}</p>}
                     </div>
                   </div>
                   <button onClick={limpiarCliente} className="text-gray-400 hover:text-gray-600 ml-2 shrink-0">
@@ -511,12 +557,12 @@ export default function VentasPage() {
                 <>
                   <form onSubmit={(e) => { e.preventDefault(); buscarClientePorDni() }} className="flex gap-2 w-full min-w-0">
                     <input
-                      type="text" inputMode="numeric" maxLength={8} value={dniInput}
+                      type="text" inputMode="numeric" maxLength={11} value={dniInput}
                       onChange={(e) => { setDniInput(e.target.value.replace(/\D/g, '')); setDniError(''); setClienteReniec(null) }}
-                      placeholder="Buscar por DNI..."
+                      placeholder="DNI (8 dig.) o RUC (11 dig.)"
                       className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <button type="submit" disabled={dniLoading || dniInput.length !== 8}
+                    <button type="submit" disabled={dniLoading || (dniInput.length !== 8 && dniInput.length !== 11)}
                       className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-40 flex items-center">
                       {dniLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     </button>
@@ -550,20 +596,18 @@ export default function VentasPage() {
             <div className="p-4">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Producto</p>
               <div className="space-y-2">
-                <select value={categoriaFiltro} onChange={(e) => { setCategoriaFiltro(e.target.value); setProductoSelId('') }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Todas las categorías</option>
-                  {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-                <select value={productoSelId} onChange={(e) => setProductoSelId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">{productosFiltrados.length === 0 ? 'Sin productos' : 'Seleccionar producto...'}</option>
-                  {productosFiltrados.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre} (stock: {p.stock})
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={categoriaFiltro}
+                  onChange={(v) => { setCategoriaFiltro(v); setProductoSelId('') }}
+                  options={categorias.map((c) => ({ value: String(c.id), label: c.nombre }))}
+                  emptyOption="Todas las categorías"
+                />
+                <SearchableSelect
+                  value={productoSelId}
+                  onChange={setProductoSelId}
+                  options={productosFiltrados.map((p) => ({ value: String(p.id), label: `${p.nombre} (stock: ${p.stock})` }))}
+                  placeholder={productosFiltrados.length === 0 ? 'Sin productos' : 'Seleccionar producto...'}
+                />
                 {productoSelId && (() => {
                   const prod = productos.find((p) => p.id === parseInt(productoSelId))
                   return prod ? (
@@ -679,9 +723,10 @@ export default function VentasPage() {
 
           </div>
         </div>
+        </>}
 
         {/* Historial de Ventas */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {tab === 'historial' && <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 space-y-3">
             <h3 className="font-semibold text-gray-800">Historial de Ventas</h3>
             <div className="flex flex-wrap items-end gap-2">
@@ -782,7 +827,8 @@ export default function VentasPage() {
               <Pagination total={ventas.length} page={page} pageSize={10} onChange={setPage} />
             </>
           )}
-        </div>
+        </div>}
+
       </div>
 
       {/* ── Modal confirmar venta ────────────────────────────────────────────── */}
@@ -1044,7 +1090,7 @@ export default function VentasPage() {
             </div>
             <div id="comprobante" className="p-6 font-mono text-sm">
               <div className="text-center mb-4">
-                <p className="text-lg font-bold">SysVenta</p>
+                <p className="text-lg font-bold">PharmaCore</p>
                 <p className="text-xs text-gray-500">Comprobante de Venta</p>
                 <p className="text-xs text-gray-400">
                   {new Date(ventaImpresion.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}

@@ -46,15 +46,27 @@ export class ReportesService {
   }
 
   // ── Resumen día ──────────────────────────────────────────────────────────────
-  async resumenDia() {
+  async resumenDia(usuarioId: number, rol: string) {
     const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
     const inicio = new Date(hoy + 'T00:00:00-05:00')
     const fin = new Date(hoy + 'T23:59:59.999-05:00')
+
+    if (rol === 'ALMACENERO') {
+      return { tipo: 'ALMACENERO' as const, fecha: hoy, cantidadVentas: 0, totalVentas: 0, cantidadCompras: 0, totalCompras: 0, ganancia: 0 }
+    }
+
+    if (rol === 'CAJERO') {
+      const ventas = await this.prisma.venta.findMany({ where: { fecha: { gte: inicio, lte: fin }, usuarioId }, include: { detalles: true } })
+      const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0)
+      return { tipo: 'CAJERO' as const, fecha: hoy, cantidadVentas: ventas.length, totalVentas, cantidadCompras: 0, totalCompras: 0, ganancia: totalVentas }
+    }
+
+    // ADMIN: todas las ventas + todas las compras
     const ventas = await this.prisma.venta.findMany({ where: { fecha: { gte: inicio, lte: fin } }, include: { detalles: true } })
     const compras = await this.prisma.compra.findMany({ where: { fecha: { gte: inicio, lte: fin } } })
     const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0)
     const totalCompras = compras.reduce((s, c) => s + Number(c.total), 0)
-    return { fecha: hoy, cantidadVentas: ventas.length, totalVentas, cantidadCompras: compras.length, totalCompras, ganancia: totalVentas - totalCompras }
+    return { tipo: 'ADMIN' as const, fecha: hoy, cantidadVentas: ventas.length, totalVentas, cantidadCompras: compras.length, totalCompras, ganancia: totalVentas - totalCompras }
   }
 
   async ventasPorFecha(desde: string, hasta: string) {
@@ -95,6 +107,87 @@ export class ReportesService {
     const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0)
     const totalCompras = compras.reduce((s, c) => s + Number(c.total), 0)
     return { anio, mes, cantidadVentas: ventas.length, totalVentas, cantidadCompras: compras.length, totalCompras, ganancia: totalVentas - totalCompras }
+  }
+
+  // ── Reporte por cajero ───────────────────────────────────────────────────────
+  async ventasPorCajero(desde: string, hasta: string) {
+    const rango = this.rango(desde, hasta)
+    const ventas = await this.prisma.venta.findMany({
+      where: { fecha: rango },
+      include: { usuario: { select: { id: true, nombre: true, rol: true } } },
+    })
+
+    const porUsuario = new Map<number, {
+      usuario: { id: number; nombre: string; rol: string }
+      totalVentas: number
+      cantidadVentas: number
+      formaPago: Record<string, number>
+    }>()
+
+    for (const v of ventas) {
+      const uid = v.usuarioId
+      if (!porUsuario.has(uid)) {
+        porUsuario.set(uid, { usuario: v.usuario, totalVentas: 0, cantidadVentas: 0, formaPago: {} })
+      }
+      const e = porUsuario.get(uid)!
+      e.totalVentas += Number(v.total)
+      e.cantidadVentas += 1
+      const fp = v.formaPago ?? 'EFECTIVO'
+      e.formaPago[fp] = (e.formaPago[fp] ?? 0) + Number(v.total)
+    }
+
+    return Array.from(porUsuario.values())
+      .map((e) => ({
+        usuario: e.usuario,
+        cantidadVentas: e.cantidadVentas,
+        totalVentas: r2(e.totalVentas),
+        ticketPromedio: e.cantidadVentas > 0 ? r2(e.totalVentas / e.cantidadVentas) : 0,
+        ventasPorFormaPago: Object.fromEntries(Object.entries(e.formaPago).map(([k, v]) => [k, r2(v)])),
+      }))
+      .sort((a, b) => b.totalVentas - a.totalVentas)
+  }
+
+  // ── Reporte por almacenero ────────────────────────────────────────────────────
+  async comprasPorAlmacenero(desde: string, hasta: string) {
+    const rango = this.rango(desde, hasta)
+    const compras = await this.prisma.compra.findMany({
+      where: { fecha: rango, usuarioId: { not: null } },
+      include: {
+        usuario: { select: { id: true, nombre: true, rol: true } },
+        proveedor: { select: { id: true, nombre: true } },
+      },
+    })
+
+    const porUsuario = new Map<number, {
+      usuario: { id: number; nombre: string; rol: string }
+      totalCompras: number
+      cantidadCompras: number
+      proveedores: Record<string, number>
+    }>()
+
+    for (const c of compras) {
+      if (!c.usuarioId || !c.usuario) continue
+      const uid = c.usuarioId
+      if (!porUsuario.has(uid)) {
+        porUsuario.set(uid, { usuario: c.usuario, totalCompras: 0, cantidadCompras: 0, proveedores: {} })
+      }
+      const e = porUsuario.get(uid)!
+      e.totalCompras += Number(c.total)
+      e.cantidadCompras += 1
+      const prov = c.proveedor?.nombre ?? 'Sin proveedor'
+      e.proveedores[prov] = (e.proveedores[prov] ?? 0) + Number(c.total)
+    }
+
+    return Array.from(porUsuario.values())
+      .map((e) => ({
+        usuario: e.usuario,
+        cantidadCompras: e.cantidadCompras,
+        totalCompras: r2(e.totalCompras),
+        comprasPorProveedor: Object.entries(e.proveedores)
+          .map(([nombre, total]) => ({ nombre, total: r2(total) }))
+          .sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => b.totalCompras - a.totalCompras)
   }
 
   // ── Excel: Ventas ────────────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ model Usuario {
 model Categoria {
   id        Int        @id @default(autoincrement())
   nombre    String     @unique
+  activo    Boolean    @default(true)
   productos Producto[]
 }
 
@@ -52,6 +53,7 @@ model Producto {
   lote              String?
   fechaVencimiento  DateTime?
   registroSanitario String?
+  presentacion      String?
 }
 
 model MovimientoStock {
@@ -73,6 +75,7 @@ model Cliente {
   id        Int      @id @default(autoincrement())
   nombre    String
   dni       String?  @unique
+  ruc       String?  @unique
   telefono  String?
   email     String?
   direccion String?

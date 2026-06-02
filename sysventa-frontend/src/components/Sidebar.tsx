@@ -14,7 +14,6 @@ const navItems = [
   { href: '/productos', icon: Package, label: 'Productos' },
   { href: '/categorias', icon: Tag, label: 'Categorias' },
   { href: '/clientes', icon: Users, label: 'Clientes' },
-  { href: '/proveedores', icon: Truck, label: 'Proveedores' },
 ]
 
 const ventasItems = [
@@ -22,6 +21,7 @@ const ventasItems = [
 ]
 
 const almacenItems = [
+  { href: '/proveedores', icon: Truck, label: 'Proveedores' },
   { href: '/compras', icon: ShoppingBag, label: 'Compras' },
   { href: '/kardex', icon: ClipboardList, label: 'Kardex' },
 ]
@@ -29,6 +29,7 @@ const almacenItems = [
 const adminItems = [
   { href: '/usuarios', icon: UserCog, label: 'Usuarios' },
   { href: '/reportes', icon: TrendingUp, label: 'Reportes' },
+  { href: '/reportes/empleados', icon: Users, label: 'Por Empleado' },
 ]
 
 const cajaItems = [
@@ -51,7 +52,7 @@ export default function Sidebar() {
       <div className="p-6 border-b border-blue-800">
         <div className="flex items-center gap-2">
           <Store className="w-7 h-7 text-blue-300" />
-          <h1 className="text-xl font-bold">SysVenta</h1>
+          <h1 className="text-xl font-bold">PharmaCore</h1>
         </div>
         <p className="text-blue-400 text-xs mt-1">Sistema de Ventas</p>
       </div>

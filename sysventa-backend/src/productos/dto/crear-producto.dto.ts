@@ -40,4 +40,8 @@ export class CrearProductoDto {
   @IsOptional()
   @IsString()
   registroSanitario?: string
+
+  @IsOptional()
+  @IsString()
+  presentacion?: string
 }

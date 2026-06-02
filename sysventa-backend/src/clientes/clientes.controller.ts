@@ -24,8 +24,10 @@ export class ClientesController {
   }
 
   @Get('buscar')
-  buscarPorDni(@Query('dni') dni: string) {
-    return this.clientesService.buscarPorDni(dni)
+  buscar(@Query('dni') dni?: string, @Query('ruc') ruc?: string) {
+    if (ruc) return this.clientesService.buscarPorRuc(ruc)
+    if (dni) return this.clientesService.buscarPorDni(dni)
+    return null
   }
 
   @Get('reniec/:dni')

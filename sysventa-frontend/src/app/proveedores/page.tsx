@@ -1,12 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import api from '@/lib/axios'
 import { Proveedor } from '@/lib/types'
-import { Plus, ToggleLeft, ToggleRight, X, Pencil } from 'lucide-react'
+import { Plus, ToggleLeft, ToggleRight, X, Pencil, Loader2, Search, Truck, Mail, UserCheck } from 'lucide-react'
 import Pagination from '@/components/Pagination'
+import { getUsuario } from '@/lib/auth'
 
 interface ProveedorForm {
   nombre: string
@@ -18,14 +20,6 @@ interface ProveedorForm {
 
 const initialForm: ProveedorForm = { nombre: '', ruc: '', contacto: '', telefono: '', email: '' }
 
-const fields: { key: keyof ProveedorForm; label: string; required: boolean; type?: string; maxLength?: number; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'] }[] = [
-  { key: 'nombre', label: 'Nombre *', required: true },
-  { key: 'ruc', label: 'RUC', required: false, maxLength: 11, inputMode: 'numeric' },
-  { key: 'contacto', label: 'Contacto', required: false },
-  { key: 'telefono', label: 'Telefono', required: false, inputMode: 'tel' },
-  { key: 'email', label: 'Email', required: false, type: 'email' },
-]
-
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,9 +27,21 @@ export default function ProveedoresPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<ProveedorForm>(initialForm)
   const [saving, setSaving] = useState(false)
+  const [rucLoading, setRucLoading] = useState(false)
+  const [rucError, setRucError] = useState('')
   const [filtro, setFiltro] = useState<'activos' | 'inactivos' | 'todos'>('activos')
+  const [busqueda, setBusqueda] = useState('')
   const [page, setPage] = useState(1)
   const { toast, showToast, closeToast } = useToast()
+  const router = useRouter()
+  const usuario = getUsuario()
+  const rol = usuario?.rol
+
+  useEffect(() => {
+    if (rol && rol !== 'ADMIN' && rol !== 'ALMACENERO') {
+      router.replace('/dashboard')
+    }
+  }, [rol, router])
 
   const load = async () => {
     try {
@@ -48,14 +54,44 @@ export default function ProveedoresPage() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    if (form.ruc.length === 11 && showModal) {
+      buscarRuc(form.ruc)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.ruc])
+
+  const buscarRuc = async (ruc: string) => {
+    setRucLoading(true)
+    setRucError('')
+    try {
+      const res = await api.get<{ razonSocial: string }>(`/facturacion/ruc/${ruc}`)
+      setForm((prev) => ({ ...prev, nombre: res.data.razonSocial }))
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'RUC no encontrado en SUNAT'
+      setRucError(msg)
+    } finally {
+      setRucLoading(false)
+    }
+  }
+
   const proveedoresFiltrados = proveedores.filter((p) => {
-    if (filtro === 'activos') return p.activo
-    if (filtro === 'inactivos') return !p.activo
+    if (filtro === 'activos' && !p.activo) return false
+    if (filtro === 'inactivos' && p.activo) return false
+    if (busqueda) {
+      const q = busqueda.toLowerCase()
+      return (
+        p.nombre.toLowerCase().includes(q) ||
+        (p.ruc ?? '').includes(q) ||
+        (p.contacto ?? '').toLowerCase().includes(q)
+      )
+    }
     return true
   })
   const proveedoresPag = proveedoresFiltrados.slice((page - 1) * 10, page * 10)
 
-  const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm) }
+  const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm); setRucError('') }
 
   const openEdit = (p: Proveedor) => {
     setEditId(p.id)
@@ -77,7 +113,7 @@ export default function ProveedoresPage() {
     ...(form.email && { email: form.email }),
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
@@ -112,6 +148,25 @@ export default function ProveedoresPage() {
       <div className="space-y-4">
         <div className="flex items-center gap-3 flex-wrap">
           <h2 className="text-lg font-semibold text-gray-700 mr-auto">Proveedores</h2>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setPage(1) }}
+              placeholder="Buscar por nombre, RUC o contacto..."
+              className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {busqueda && (
+              <button
+                onClick={() => { setBusqueda(''); setPage(1) }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
             {(['activos', 'inactivos', 'todos'] as const).map((op) => (
               <button
@@ -129,13 +184,46 @@ export default function ProveedoresPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => { setEditId(null); setShowModal(true) }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Proveedor
-          </button>
+          {(rol === 'ADMIN' || rol === 'ALMACENERO') && (
+            <button
+              onClick={() => { setEditId(null); setShowModal(true) }}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo Proveedor
+            </button>
+          )}
+        </div>
+
+        {/* Tarjetas resumen */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-blue-100 p-3 rounded-lg">
+              <Truck className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Activos</p>
+              <p className="text-2xl font-bold text-gray-800">{proveedores.filter(p => p.activo).length}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-green-100 p-3 rounded-lg">
+              <UserCheck className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Con contacto</p>
+              <p className="text-2xl font-bold text-gray-800">{proveedores.filter(p => p.activo && p.contacto).length}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <Mail className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Con email</p>
+              <p className="text-2xl font-bold text-gray-800">{proveedores.filter(p => p.activo && p.email).length}</p>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -177,19 +265,23 @@ export default function ProveedoresPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => openEdit(p)}
-                              className="text-blue-500 hover:text-blue-700 transition-colors"
-                              title="Editar"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleToggle(p)} title={p.activo ? 'Desactivar' : 'Activar'}>
-                              {p.activo
-                                ? <ToggleRight className="w-6 h-6 text-green-500" />
-                                : <ToggleLeft className="w-6 h-6 text-gray-400" />
-                              }
-                            </button>
+                            {(rol === 'ADMIN' || rol === 'ALMACENERO') && (
+                              <button
+                                onClick={() => openEdit(p)}
+                                className="text-blue-500 hover:text-blue-700 transition-colors"
+                                title="Editar"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            {rol === 'ADMIN' && (
+                              <button onClick={() => handleToggle(p)} title={p.activo ? 'Desactivar' : 'Activar'}>
+                                {p.activo
+                                  ? <ToggleRight className="w-6 h-6 text-green-500" />
+                                  : <ToggleLeft className="w-6 h-6 text-gray-400" />
+                                }
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -217,23 +309,71 @@ export default function ProveedoresPage() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {fields.map(({ key, label, required, type, maxLength, inputMode }) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+              {/* Nombre */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                <div className="relative">
                   <input
-                    required={required}
-                    type={type}
-                    maxLength={maxLength}
-                    inputMode={inputMode}
-                    value={form[key]}
-                    onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    value={form.nombre}
+                    onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
                   />
-                  {key === 'ruc' && (
-                    <p className="text-xs text-gray-400 mt-1">{form.ruc.length}/11 dígitos</p>
+                  {rucLoading && (
+                    <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-blue-500" />
                   )}
                 </div>
-              ))}
+              </div>
+
+              {/* RUC */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  RUC <span className="text-xs text-gray-400 font-normal">(autocompleta nombre al completar 11 dígitos)</span>
+                </label>
+                <input
+                  maxLength={11}
+                  inputMode="numeric"
+                  value={form.ruc}
+                  onChange={(e) => { setForm({ ...form, ruc: e.target.value.replace(/\D/g, '') }); setRucError('') }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {rucError
+                  ? <p className="text-xs text-red-500 mt-1">{rucError}</p>
+                  : <p className="text-xs text-gray-400 mt-1">{form.ruc.length}/11 dígitos</p>
+                }
+              </div>
+
+              {/* Contacto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contacto</label>
+                <input
+                  value={form.contacto}
+                  onChange={(e) => setForm({ ...form, contacto: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Telefono */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+                <input
+                  inputMode="tel"
+                  value={form.telefono}
+                  onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"

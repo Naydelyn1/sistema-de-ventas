@@ -10,6 +10,8 @@ export interface Usuario {
 export interface Categoria {
   id: number
   nombre: string
+  activo?: boolean
+  _count?: { productos: number }
 }
 
 export interface Producto {
@@ -25,12 +27,14 @@ export interface Producto {
   lote?: string
   fechaVencimiento?: string
   registroSanitario?: string
+  presentacion?: string
 }
 
 export interface Cliente {
   id: number
   nombre: string
   dni?: string
+  ruc?: string
   telefono?: string
   email?: string
   direccion?: string
@@ -112,6 +116,7 @@ export interface Compra {
 }
 
 export interface ResumenDia {
+  tipo: 'ADMIN' | 'CAJERO' | 'ALMACENERO'
   fecha: string
   cantidadVentas: number
   totalVentas: number

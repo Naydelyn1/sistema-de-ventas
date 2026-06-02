@@ -16,11 +16,13 @@ export class ProveedoresController {
     return this.proveedoresService.crear(dto)
   }
 
+  @Roles('ADMIN', 'ALMACENERO')
   @Get()
   findAll(@Query('todos') todos?: string) {
     return this.proveedoresService.findAll(todos !== 'true')
   }
 
+  @Roles('ADMIN', 'ALMACENERO')
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.proveedoresService.findOne(id)

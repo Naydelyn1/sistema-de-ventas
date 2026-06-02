@@ -43,4 +43,8 @@ export class ActualizarProductoDto {
   @IsOptional()
   @IsString()
   registroSanitario?: string
+
+  @IsOptional()
+  @IsString()
+  presentacion?: string
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common'
+import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common'
 import type { Response } from 'express'
 import { ReportesService } from './reportes.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -12,8 +12,9 @@ export class ReportesController {
   constructor(private readonly reportesService: ReportesService) {}
 
   @Get('resumen-dia')
-  resumenDia() {
-    return this.reportesService.resumenDia()
+  @Roles('ADMIN', 'CAJERO', 'ALMACENERO')
+  resumenDia(@Req() req: any) {
+    return this.reportesService.resumenDia(req.user.id, req.user.rol)
   }
 
   @Get('ventas-por-fecha')
@@ -41,6 +42,16 @@ export class ReportesController {
     @Query('mes') mes: string,
   ) {
     return this.reportesService.resumenMensual(Number(anio), Number(mes))
+  }
+
+  @Get('ventas-por-cajero')
+  ventasPorCajero(@Query('desde') desde: string, @Query('hasta') hasta: string) {
+    return this.reportesService.ventasPorCajero(desde, hasta)
+  }
+
+  @Get('compras-por-almacenero')
+  comprasPorAlmacenero(@Query('desde') desde: string, @Query('hasta') hasta: string) {
+    return this.reportesService.comprasPorAlmacenero(desde, hasta)
   }
 
   @Get('excel/ventas')

@@ -29,6 +29,7 @@ export default function SearchableSelect({
   const [query, setQuery] = useState('')
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const selectedLabel = value === ''
@@ -41,7 +42,10 @@ export default function SearchableSelect({
 
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const insideContainer = containerRef.current?.contains(target)
+      const insideDropdown = dropdownRef.current?.contains(target)
+      if (!insideContainer && !insideDropdown) {
         setOpen(false)
         setQuery('')
       }
@@ -73,7 +77,7 @@ export default function SearchableSelect({
   }
 
   const dropdown = open ? (
-    <div style={dropdownStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg">
+    <div ref={dropdownRef} style={dropdownStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg">
       <div className="p-2 border-b border-gray-100">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />

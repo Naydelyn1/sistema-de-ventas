@@ -4,10 +4,13 @@ import { useRouter } from 'next/navigation'
 import { isAuthenticated } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import LockScreen from './LockScreen'
+import { useInactivityLock } from '@/hooks/useInactivityLock'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [ready, setReady] = useState(false)
+  const { isLocked, unlock } = useInactivityLock()
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -32,6 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Header />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
+      {isLocked && <LockScreen onUnlock={unlock} />}
     </div>
   )
 }

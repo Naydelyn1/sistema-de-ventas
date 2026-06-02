@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Request, Query } from '@nestjs/common'
 import { CajaService } from './caja.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -26,13 +26,19 @@ export class CajaController {
   }
 
   @Get('actual')
-  actual() {
-    return this.cajaService.turnoActual()
+  actual(@Request() req: any) {
+    return this.cajaService.turnoActual(req.user.id)
+  }
+
+  @Roles('ADMIN')
+  @Get('activas')
+  activas() {
+    return this.cajaService.turnosActivos()
   }
 
   @Roles('ADMIN')
   @Get('historial')
-  historial() {
-    return this.cajaService.historial()
+  historial(@Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.cajaService.historial(desde, hasta)
   }
 }

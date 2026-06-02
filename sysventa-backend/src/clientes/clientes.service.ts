@@ -40,6 +40,10 @@ export class ClientesService {
     return this.prisma.cliente.findUnique({ where: { dni } })
   }
 
+  async buscarPorRuc(ruc: string) {
+    return this.prisma.cliente.findUnique({ where: { ruc } })
+  }
+
   async actualizar(id: number, dto: CrearClienteDto) {
     await this.findOne(id)
     return this.prisma.cliente.update({ where: { id }, data: dto })
