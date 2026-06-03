@@ -1,9 +1,22 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Request, Query } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common'
 import { CajaService } from './caja.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Caja')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('caja')
 export class CajaController {
@@ -11,7 +24,10 @@ export class CajaController {
 
   @Roles('ADMIN', 'CAJERO')
   @Post('abrir')
-  abrir(@Body('montoInicial') montoInicial: number, @Request() req: any) {
+  abrir(
+    @Body('montoInicial') montoInicial: number,
+    @Request() req: { user: { id: number } },
+  ) {
     return this.cajaService.abrirTurno(req.user.id, Number(montoInicial))
   }
 
@@ -26,7 +42,7 @@ export class CajaController {
   }
 
   @Get('actual')
-  actual(@Request() req: any) {
+  actual(@Request() req: { user: { id: number } }) {
     return this.cajaService.turnoActual(req.user.id)
   }
 

@@ -8,7 +8,10 @@ export class ProductosService {
   constructor(private prisma: PrismaService) {}
 
   async crear(dto: CrearProductoDto) {
-    return this.prisma.producto.create({ data: dto, include: { categoria: true } })
+    return this.prisma.producto.create({
+      data: dto,
+      include: { categoria: true },
+    })
   }
 
   async findAll(soloActivos = true) {
@@ -20,19 +23,29 @@ export class ProductosService {
   }
 
   async findOne(id: number) {
-    const producto = await this.prisma.producto.findUnique({ where: { id }, include: { categoria: true } })
+    const producto = await this.prisma.producto.findUnique({
+      where: { id },
+      include: { categoria: true },
+    })
     if (!producto) throw new NotFoundException('Producto no encontrado')
     return producto
   }
 
   async actualizar(id: number, dto: ActualizarProductoDto) {
     await this.findOne(id)
-    return this.prisma.producto.update({ where: { id }, data: dto, include: { categoria: true } })
+    return this.prisma.producto.update({
+      where: { id },
+      data: dto,
+      include: { categoria: true },
+    })
   }
 
   async toggleActivo(id: number) {
     const producto = await this.findOne(id)
-    return this.prisma.producto.update({ where: { id }, data: { activo: !producto.activo } })
+    return this.prisma.producto.update({
+      where: { id },
+      data: { activo: !producto.activo },
+    })
   }
 
   async stockBajo() {
@@ -59,30 +72,56 @@ export class ProductosService {
     // Para evitar duplicados: eliminar todos y reconstruir desde cero
     await this.prisma.movimientoStock.deleteMany({})
 
-    const productos = await this.prisma.producto.findMany({ select: { id: true, stock: true } })
+    const productos = await this.prisma.producto.findMany({
+      select: { id: true, stock: true },
+    })
 
     // Obtener todas las transacciones ordenadas por fecha ASC
     const compras = await this.prisma.detalleCompra.findMany({
-      include: { compra: { select: { id: true, fecha: true, usuarioId: true } } },
+      include: {
+        compra: { select: { id: true, fecha: true, usuarioId: true } },
+      },
       orderBy: { compra: { fecha: 'asc' } },
     })
     const ventas = await this.prisma.detalleVenta.findMany({
-      include: { venta: { select: { id: true, fecha: true, usuarioId: true } } },
+      include: {
+        venta: { select: { id: true, fecha: true, usuarioId: true } },
+      },
       orderBy: { venta: { fecha: 'asc' } },
     })
 
     // Calcular stock inicial por producto: stock_actual + total_salidas - total_entradas
     const stockSim: Record<number, number> = {}
     for (const p of productos) {
-      const entradas = compras.filter((c) => c.productoId === p.id).reduce((s, c) => s + c.cantidad, 0)
-      const salidas = ventas.filter((v) => v.productoId === p.id).reduce((s, v) => s + v.cantidad, 0)
+      const entradas = compras
+        .filter((c) => c.productoId === p.id)
+        .reduce((s, c) => s + c.cantidad, 0)
+      const salidas = ventas
+        .filter((v) => v.productoId === p.id)
+        .reduce((s, v) => s + v.cantidad, 0)
       stockSim[p.id] = Math.max(0, p.stock + salidas - entradas)
     }
 
     // Mezclar compras y ventas en orden cronológico
     type Evento =
-      | { tipo: 'ENTRADA'; fecha: Date; productoId: number; cantidad: number; compraId: number; ventaId?: never; usuarioId: number | null }
-      | { tipo: 'SALIDA'; fecha: Date; productoId: number; cantidad: number; ventaId: number; compraId?: never; usuarioId: number | null }
+      | {
+          tipo: 'ENTRADA'
+          fecha: Date
+          productoId: number
+          cantidad: number
+          compraId: number
+          ventaId?: never
+          usuarioId: number | null
+        }
+      | {
+          tipo: 'SALIDA'
+          fecha: Date
+          productoId: number
+          cantidad: number
+          ventaId: number
+          compraId?: never
+          usuarioId: number | null
+        }
 
     const eventos: Evento[] = [
       ...compras.map((c) => ({
@@ -106,7 +145,10 @@ export class ProductosService {
     // Crear movimientos en orden
     for (const ev of eventos) {
       const stockAntes = stockSim[ev.productoId] ?? 0
-      const stockDespues = ev.tipo === 'ENTRADA' ? stockAntes + ev.cantidad : stockAntes - ev.cantidad
+      const stockDespues =
+        ev.tipo === 'ENTRADA'
+          ? stockAntes + ev.cantidad
+          : stockAntes - ev.cantidad
       stockSim[ev.productoId] = stockDespues
       await this.prisma.movimientoStock.create({
         data: {
@@ -129,7 +171,9 @@ export class ProductosService {
 
   async kardex(id: number, desde?: string, hasta?: string) {
     await this.findOne(id)
-    const where: any = { productoId: id }
+    const where: { productoId: number; fecha?: { gte: Date; lte: Date } } = {
+      productoId: id,
+    }
     if (desde && hasta) {
       where.fecha = {
         gte: new Date(desde + 'T00:00:00-05:00'),

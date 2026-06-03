@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadGatewayException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadGatewayException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import axios from 'axios'
@@ -6,6 +10,23 @@ import { EmitirBoletaDto } from './dto/emitir-boleta.dto'
 import { EmitirFacturaDto } from './dto/emitir-factura.dto'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
+
+interface NubefactResponse {
+  serie: string
+  numero: number
+  enlace_del_pdf: string
+  aceptada_por_sunat: boolean
+}
+
+interface RucApiResponse {
+  data: {
+    numero?: string
+    nombre_o_razon_social?: string
+    nombre_completo?: string
+    direccion?: string
+    estado?: string
+  }
+}
 
 interface NubefactItem {
   unidad_de_medida: string
@@ -40,7 +61,14 @@ export class FacturacionService {
     return venta
   }
 
-  private buildItems(detalles: { productoId: number; cantidad: number; precioUnitario: any; producto: { nombre: string } }[]): NubefactItem[] {
+  private buildItems(
+    detalles: {
+      productoId: number
+      cantidad: number
+      precioUnitario: any
+      producto: { nombre: string }
+    }[],
+  ): NubefactItem[] {
     return detalles.map((d) => {
       const precioConIgv = r2(Number(d.precioUnitario))
       const valorUnit = r2(precioConIgv / 1.18)
@@ -79,11 +107,11 @@ export class FacturacionService {
     return `${d}/${m}/${fecha.getFullYear()}`
   }
 
-  private async enviarNubefact(payload: object) {
+  private async enviarNubefact(payload: object): Promise<NubefactResponse> {
     const url = this.configService.get<string>('NUBEFACT_URL')
     const token = this.configService.get<string>('NUBEFACT_TOKEN')
     try {
-      const { data } = await axios.post(url!, payload, {
+      const { data } = await axios.post<NubefactResponse>(url!, payload, {
         headers: {
           Authorization: `Token token=${token}`,
           'Content-Type': 'application/json',
@@ -93,7 +121,10 @@ export class FacturacionService {
       return data
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        const msg = error.response?.data?.errors ?? error.response?.data?.message ?? error.message
+        const errData = error.response?.data as
+          | { errors?: unknown; message?: unknown }
+          | undefined
+        const msg = errData?.errors ?? errData?.message ?? error.message
         throw new BadGatewayException(`Nubefact: ${JSON.stringify(msg)}`)
       }
       throw new BadGatewayException('Error al conectar con Nubefact')
@@ -112,8 +143,10 @@ export class FacturacionService {
       numero: venta.id,
       sunat_transaction: 1,
       cliente_tipo_de_documento: 1,
-      cliente_numero_de_documento: dto.dniCliente ?? venta.cliente?.dni ?? '99999999',
-      cliente_denominacion: dto.nombreCliente ?? venta.cliente?.nombre ?? 'CLIENTE VARIOS',
+      cliente_numero_de_documento:
+        dto.dniCliente ?? venta.cliente?.dni ?? '99999999',
+      cliente_denominacion:
+        dto.nombreCliente ?? venta.cliente?.nombre ?? 'CLIENTE VARIOS',
       cliente_direccion: venta.cliente?.direccion ?? '',
       cliente_email: venta.cliente?.email ?? '',
       fecha_de_emision: this.fechaFormato(new Date(venta.fecha)),
@@ -223,7 +256,7 @@ export class FacturacionService {
   async consultarRuc(ruc: string) {
     const token = this.configService.get<string>('RENIEC_API_TOKEN')
     try {
-      const { data } = await axios.get(
+      const { data } = await axios.get<RucApiResponse>(
         `https://api.decolecta.com/api/ruc/${ruc}`,
         { headers: { Authorization: `Bearer ${token}` }, timeout: 5000 },
       )
@@ -236,8 +269,10 @@ export class FacturacionService {
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 404) throw new NotFoundException('RUC no encontrado')
-        if (error.response?.status === 401) throw new BadGatewayException('Token inválido')
+        if (error.response?.status === 404)
+          throw new NotFoundException('RUC no encontrado')
+        if (error.response?.status === 401)
+          throw new BadGatewayException('Token inválido')
       }
       throw new BadGatewayException('Error al consultar el RUC')
     }

@@ -1,11 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, ParseIntPipe } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common'
 import { UsuariosService } from './usuarios.service'
 import { CrearUsuarioDto } from './dto/crear-usuario.dto'
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Usuarios')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('usuarios')
 export class UsuariosController {
@@ -31,7 +43,10 @@ export class UsuariosController {
 
   @Roles('ADMIN')
   @Patch(':id')
-  actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarUsuarioDto) {
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarUsuarioDto,
+  ) {
     return this.usuariosService.actualizar(id, dto)
   }
 

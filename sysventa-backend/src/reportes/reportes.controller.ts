@@ -4,7 +4,10 @@ import { ReportesService } from './reportes.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Reportes')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @Controller('reportes')
@@ -13,7 +16,7 @@ export class ReportesController {
 
   @Get('resumen-dia')
   @Roles('ADMIN', 'CAJERO', 'ALMACENERO')
-  resumenDia(@Req() req: any) {
+  resumenDia(@Req() req: { user: { id: number; rol: string } }) {
     return this.reportesService.resumenDia(req.user.id, req.user.rol)
   }
 
@@ -37,20 +40,23 @@ export class ReportesController {
   }
 
   @Get('resumen-mensual')
-  resumenMensual(
-    @Query('anio') anio: string,
-    @Query('mes') mes: string,
-  ) {
+  resumenMensual(@Query('anio') anio: string, @Query('mes') mes: string) {
     return this.reportesService.resumenMensual(Number(anio), Number(mes))
   }
 
   @Get('ventas-por-cajero')
-  ventasPorCajero(@Query('desde') desde: string, @Query('hasta') hasta: string) {
+  ventasPorCajero(
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+  ) {
     return this.reportesService.ventasPorCajero(desde, hasta)
   }
 
   @Get('compras-por-almacenero')
-  comprasPorAlmacenero(@Query('desde') desde: string, @Query('hasta') hasta: string) {
+  comprasPorAlmacenero(
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+  ) {
     return this.reportesService.comprasPorAlmacenero(desde, hasta)
   }
 
@@ -62,7 +68,8 @@ export class ReportesController {
   ) {
     const buffer = await this.reportesService.excelVentas(desde, hasta)
     res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="ventas-${desde}-${hasta}.xlsx"`,
     })
     res.send(buffer)
@@ -76,7 +83,8 @@ export class ReportesController {
   ) {
     const buffer = await this.reportesService.excelCompras(desde, hasta)
     res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="compras-${desde}-${hasta}.xlsx"`,
     })
     res.send(buffer)
@@ -85,9 +93,12 @@ export class ReportesController {
   @Get('excel/stock')
   async excelStock(@Res() res: Response) {
     const buffer = await this.reportesService.excelStock()
-    const fecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
+    const fecha = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+    }).format(new Date())
     res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="stock-${fecha}.xlsx"`,
     })
     res.send(buffer)

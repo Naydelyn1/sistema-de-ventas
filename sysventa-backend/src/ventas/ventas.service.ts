@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CrearVentaDto } from './dto/crear-venta.dto'
 
@@ -7,15 +11,26 @@ export class VentasService {
   constructor(private prisma: PrismaService) {}
 
   async crear(dto: CrearVentaDto, usuarioId: number) {
-    const turnoAbierto = await this.prisma.turnoCaja.findFirst({ where: { estado: 'ABIERTO' } })
-    if (!turnoAbierto) throw new BadRequestException('No hay un turno de caja abierto. Abre el turno antes de realizar ventas.')
+    const turnoAbierto = await this.prisma.turnoCaja.findFirst({
+      where: { estado: 'ABIERTO' },
+    })
+    if (!turnoAbierto)
+      throw new BadRequestException(
+        'No hay un turno de caja abierto. Abre el turno antes de realizar ventas.',
+      )
 
     for (const detalle of dto.detalles) {
-      const producto = await this.prisma.producto.findUnique({ where: { id: detalle.productoId } })
-      if (!producto || !producto.activo) throw new NotFoundException(`Producto ${detalle.productoId} no encontrado`)
-      if (producto.stock < detalle.cantidad) throw new BadRequestException(
-        `Stock insuficiente para ${producto.nombre}. Disponible: ${producto.stock}`
-      )
+      const producto = await this.prisma.producto.findUnique({
+        where: { id: detalle.productoId },
+      })
+      if (!producto || !producto.activo)
+        throw new NotFoundException(
+          `Producto ${detalle.productoId} no encontrado`,
+        )
+      if (producto.stock < detalle.cantidad)
+        throw new BadRequestException(
+          `Stock insuficiente para ${producto.nombre}. Disponible: ${producto.stock}`,
+        )
     }
 
     const descPct = dto.descuentoPct ?? 0
@@ -23,10 +38,17 @@ export class VentasService {
 
     const venta = await this.prisma.$transaction(async (tx) => {
       let totalBruto = 0
-      const detallesData: { productoId: number; cantidad: number; precioUnitario: any; subtotal: number }[] = []
+      const detallesData: {
+        productoId: number
+        cantidad: number
+        precioUnitario: any
+        subtotal: number
+      }[] = []
 
       for (const detalle of dto.detalles) {
-        const producto = await tx.producto.findUnique({ where: { id: detalle.productoId } })
+        const producto = await tx.producto.findUnique({
+          where: { id: detalle.productoId },
+        })
         const subtotal = Number(producto!.precio) * detalle.cantidad
         totalBruto += subtotal
 
@@ -118,7 +140,9 @@ export class VentasService {
       fechaDesde = new Date(desde + 'T00:00:00-05:00')
       fechaHasta = new Date(hasta + 'T23:59:59.999-05:00')
     } else {
-      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
+      const hoy = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Lima',
+      }).format(new Date())
       fechaDesde = new Date(hoy + 'T00:00:00-05:00')
       fechaHasta = new Date(hoy + 'T23:59:59.999-05:00')
     }

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import api from '@/lib/axios'
 import { setAuth } from '@/lib/auth'
 import { AuthResponse } from '@/lib/types'
@@ -48,8 +49,8 @@ export default function LoginPage() {
           Bienvenido a
         </p>
 
-        <div className="mb-6 rounded-full overflow-hidden w-40 h-40 border-4 border-white border-opacity-30 shadow-2xl">
-          <img src="/farmacia.png" alt="Farmacia" className="w-full h-full object-cover" />
+        <div className="relative mb-6 rounded-full overflow-hidden w-40 h-40 border-4 border-white border-opacity-30 shadow-2xl">
+          <Image src="/farmacia.png" alt="Farmacia" fill className="object-cover" />
         </div>
 
         <h1 className="text-4xl font-black tracking-wide mb-3">PharmaCore</h1>

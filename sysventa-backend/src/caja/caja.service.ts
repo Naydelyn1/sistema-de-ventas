@@ -1,15 +1,31 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
-const FORMAS_PAGO = ['EFECTIVO', 'YAPE_PLIN', 'TARJETA', 'TRANSFERENCIA'] as const
+const FORMAS_PAGO = [
+  'EFECTIVO',
+  'YAPE_PLIN',
+  'TARJETA',
+  'TRANSFERENCIA',
+] as const
 
 @Injectable()
 export class CajaService {
   constructor(private prisma: PrismaService) {}
 
-  private async ventasPorFormaPago(desde: Date, usuarioId: number, hasta?: Date) {
+  private async ventasPorFormaPago(
+    desde: Date,
+    usuarioId: number,
+    hasta?: Date,
+  ) {
     const ventas = await this.prisma.venta.findMany({
-      where: { fecha: { gte: desde, ...(hasta ? { lte: hasta } : {}) }, usuarioId },
+      where: {
+        fecha: { gte: desde, ...(hasta ? { lte: hasta } : {}) },
+        usuarioId,
+      },
       select: { total: true, formaPago: true },
     })
 
@@ -22,17 +38,27 @@ export class CajaService {
     }
 
     for (const v of ventas) {
-      const fp = (v.formaPago ?? 'EFECTIVO') as string
+      const fp = v.formaPago ?? 'EFECTIVO'
       totales[fp] = (totales[fp] ?? 0) + Number(v.total)
       cantidades[fp] = (cantidades[fp] ?? 0) + 1
     }
 
-    return { totales, cantidades, totalGeneral: ventas.reduce((s, v) => s + Number(v.total), 0), cantidad: ventas.length }
+    return {
+      totales,
+      cantidades,
+      totalGeneral: ventas.reduce((s, v) => s + Number(v.total), 0),
+      cantidad: ventas.length,
+    }
   }
 
   async abrirTurno(usuarioId: number, montoInicial: number) {
-    const abierto = await this.prisma.turnoCaja.findFirst({ where: { estado: 'ABIERTO', usuarioId } })
-    if (abierto) throw new BadRequestException('Ya tienes un turno abierto. Ciérralo antes de abrir uno nuevo.')
+    const abierto = await this.prisma.turnoCaja.findFirst({
+      where: { estado: 'ABIERTO', usuarioId },
+    })
+    if (abierto)
+      throw new BadRequestException(
+        'Ya tienes un turno abierto. Ciérralo antes de abrir uno nuevo.',
+      )
 
     return this.prisma.turnoCaja.create({
       data: { usuarioId, montoInicial, estado: 'ABIERTO' },
@@ -40,12 +66,22 @@ export class CajaService {
     })
   }
 
-  async cerrarTurno(turnoId: number, montoFinal: number, observaciones?: string) {
-    const turno = await this.prisma.turnoCaja.findUnique({ where: { id: turnoId } })
+  async cerrarTurno(
+    turnoId: number,
+    montoFinal: number,
+    observaciones?: string,
+  ) {
+    const turno = await this.prisma.turnoCaja.findUnique({
+      where: { id: turnoId },
+    })
     if (!turno) throw new NotFoundException('Turno no encontrado')
-    if (turno.estado === 'CERRADO') throw new BadRequestException('Este turno ya fue cerrado')
+    if (turno.estado === 'CERRADO')
+      throw new BadRequestException('Este turno ya fue cerrado')
 
-    const { totales, totalGeneral } = await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId)
+    const { totales, totalGeneral } = await this.ventasPorFormaPago(
+      turno.fechaApertura,
+      turno.usuarioId,
+    )
     const totalEfectivo = totales['EFECTIVO'] ?? 0
     const montoEsperado = Number(turno.montoInicial) + totalEfectivo
     const diferencia = montoFinal - montoEsperado
@@ -72,7 +108,8 @@ export class CajaService {
     })
     if (!turno) return null
 
-    const { totales, cantidades, totalGeneral, cantidad } = await this.ventasPorFormaPago(turno.fechaApertura, usuarioId)
+    const { totales, cantidades, totalGeneral, cantidad } =
+      await this.ventasPorFormaPago(turno.fechaApertura, usuarioId)
     const totalEfectivo = totales['EFECTIVO'] ?? 0
 
     return {
@@ -95,7 +132,8 @@ export class CajaService {
 
     return Promise.all(
       turnos.map(async (turno) => {
-        const { totales, cantidades, totalGeneral, cantidad } = await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId)
+        const { totales, cantidades, totalGeneral, cantidad } =
+          await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId)
         const totalEfectivo = totales['EFECTIVO'] ?? 0
         return {
           ...turno,
@@ -106,7 +144,7 @@ export class CajaService {
           totalVentasTodas: totalGeneral,
           montoEsperado: Number(turno.montoInicial) + totalEfectivo,
         }
-      })
+      }),
     )
   }
 
@@ -128,7 +166,11 @@ export class CajaService {
       turnos.map(async (turno) => {
         const hastaDate = turno.fechaCierre ?? undefined
         const { totales, cantidades, totalGeneral, cantidad } =
-          await this.ventasPorFormaPago(turno.fechaApertura, turno.usuarioId, hastaDate)
+          await this.ventasPorFormaPago(
+            turno.fechaApertura,
+            turno.usuarioId,
+            hastaDate,
+          )
         const totalEfectivo = totales['EFECTIVO'] ?? 0
         return {
           ...turno,

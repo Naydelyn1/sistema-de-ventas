@@ -19,15 +19,22 @@ export class ReportesService {
   private fmtFecha(d: Date) {
     return new Intl.DateTimeFormat('es-PE', {
       timeZone: 'America/Lima',
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     }).format(d)
   }
 
   private estiloCabecera(ws: ExcelJS.Worksheet, cols: number) {
     const row = ws.getRow(1)
     row.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } }
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E40AF' },
+      }
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
       cell.alignment = { vertical: 'middle', horizontal: 'center' }
     })
@@ -40,60 +47,123 @@ export class ReportesService {
   private filaAlterna(ws: ExcelJS.Worksheet, rowNum: number) {
     if (rowNum % 2 === 0) {
       ws.getRow(rowNum).eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4FF' } }
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF0F4FF' },
+        }
       })
     }
   }
 
   // ── Resumen día ──────────────────────────────────────────────────────────────
   async resumenDia(usuarioId: number, rol: string) {
-    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
+    const hoy = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+    }).format(new Date())
     const inicio = new Date(hoy + 'T00:00:00-05:00')
     const fin = new Date(hoy + 'T23:59:59.999-05:00')
 
     if (rol === 'ALMACENERO') {
-      return { tipo: 'ALMACENERO' as const, fecha: hoy, cantidadVentas: 0, totalVentas: 0, cantidadCompras: 0, totalCompras: 0, ganancia: 0 }
+      return {
+        tipo: 'ALMACENERO' as const,
+        fecha: hoy,
+        cantidadVentas: 0,
+        totalVentas: 0,
+        cantidadCompras: 0,
+        totalCompras: 0,
+        ganancia: 0,
+      }
     }
 
     if (rol === 'CAJERO') {
-      const ventas = await this.prisma.venta.findMany({ where: { fecha: { gte: inicio, lte: fin }, usuarioId }, include: { detalles: true } })
+      const ventas = await this.prisma.venta.findMany({
+        where: { fecha: { gte: inicio, lte: fin }, usuarioId },
+        include: { detalles: true },
+      })
       const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0)
-      return { tipo: 'CAJERO' as const, fecha: hoy, cantidadVentas: ventas.length, totalVentas, cantidadCompras: 0, totalCompras: 0, ganancia: totalVentas }
+      return {
+        tipo: 'CAJERO' as const,
+        fecha: hoy,
+        cantidadVentas: ventas.length,
+        totalVentas,
+        cantidadCompras: 0,
+        totalCompras: 0,
+        ganancia: totalVentas,
+      }
     }
 
     // ADMIN: todas las ventas + todas las compras
-    const ventas = await this.prisma.venta.findMany({ where: { fecha: { gte: inicio, lte: fin } }, include: { detalles: true } })
-    const compras = await this.prisma.compra.findMany({ where: { fecha: { gte: inicio, lte: fin } } })
+    const ventas = await this.prisma.venta.findMany({
+      where: { fecha: { gte: inicio, lte: fin } },
+      include: { detalles: true },
+    })
+    const compras = await this.prisma.compra.findMany({
+      where: { fecha: { gte: inicio, lte: fin } },
+    })
     const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0)
     const totalCompras = compras.reduce((s, c) => s + Number(c.total), 0)
-    return { tipo: 'ADMIN' as const, fecha: hoy, cantidadVentas: ventas.length, totalVentas, cantidadCompras: compras.length, totalCompras, ganancia: totalVentas - totalCompras }
+    return {
+      tipo: 'ADMIN' as const,
+      fecha: hoy,
+      cantidadVentas: ventas.length,
+      totalVentas,
+      cantidadCompras: compras.length,
+      totalCompras,
+      ganancia: totalVentas - totalCompras,
+    }
   }
 
   async ventasPorFecha(desde: string, hasta: string) {
-    const ventas = await this.prisma.venta.findMany({ where: { fecha: this.rango(desde, hasta) }, orderBy: { fecha: 'asc' } })
-    const peruFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' })
+    const ventas = await this.prisma.venta.findMany({
+      where: { fecha: this.rango(desde, hasta) },
+      orderBy: { fecha: 'asc' },
+    })
+    const peruFmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+    })
     const grouped = new Map<string, { total: number; cantidad: number }>()
     for (const v of ventas) {
       const dateKey = peruFmt.format(v.fecha)
       const existing = grouped.get(dateKey) ?? { total: 0, cantidad: 0 }
-      grouped.set(dateKey, { total: existing.total + Number(v.total), cantidad: existing.cantidad + 1 })
+      grouped.set(dateKey, {
+        total: existing.total + Number(v.total),
+        cantidad: existing.cantidad + 1,
+      })
     }
-    return Array.from(grouped.entries()).map(([fecha, data]) => ({ fecha, ...data }))
+    return Array.from(grouped.entries()).map(([fecha, data]) => ({
+      fecha,
+      ...data,
+    }))
   }
 
   async productosMasVendidos() {
     const detalles = await this.prisma.detalleVenta.groupBy({
-      by: ['productoId'], _sum: { cantidad: true, subtotal: true },
-      orderBy: { _sum: { cantidad: 'desc' } }, take: 10,
+      by: ['productoId'],
+      _sum: { cantidad: true, subtotal: true },
+      orderBy: { _sum: { cantidad: 'desc' } },
+      take: 10,
     })
-    return Promise.all(detalles.map(async (d) => {
-      const producto = await this.prisma.producto.findUnique({ where: { id: d.productoId }, select: { id: true, nombre: true, precio: true } })
-      return { producto, cantidadVendida: d._sum.cantidad, totalGenerado: d._sum.subtotal }
-    }))
+    return Promise.all(
+      detalles.map(async (d) => {
+        const producto = await this.prisma.producto.findUnique({
+          where: { id: d.productoId },
+          select: { id: true, nombre: true, precio: true },
+        })
+        return {
+          producto,
+          cantidadVendida: d._sum.cantidad,
+          totalGenerado: d._sum.subtotal,
+        }
+      }),
+    )
   }
 
   async stockBajo() {
-    const productos = await this.prisma.producto.findMany({ where: { activo: true }, include: { categoria: true } })
+    const productos = await this.prisma.producto.findMany({
+      where: { activo: true },
+      include: { categoria: true },
+    })
     return productos.filter((p) => p.stock <= p.stockMinimo)
   }
 
@@ -102,11 +172,23 @@ export class ReportesService {
     const lastDay = new Date(anio, mes, 0).getDate()
     const inicio = new Date(`${anio}-${mm}-01T00:00:00-05:00`)
     const fin = new Date(`${anio}-${mm}-${lastDay}T23:59:59.999-05:00`)
-    const ventas = await this.prisma.venta.findMany({ where: { fecha: { gte: inicio, lte: fin } } })
-    const compras = await this.prisma.compra.findMany({ where: { fecha: { gte: inicio, lte: fin } } })
+    const ventas = await this.prisma.venta.findMany({
+      where: { fecha: { gte: inicio, lte: fin } },
+    })
+    const compras = await this.prisma.compra.findMany({
+      where: { fecha: { gte: inicio, lte: fin } },
+    })
     const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0)
     const totalCompras = compras.reduce((s, c) => s + Number(c.total), 0)
-    return { anio, mes, cantidadVentas: ventas.length, totalVentas, cantidadCompras: compras.length, totalCompras, ganancia: totalVentas - totalCompras }
+    return {
+      anio,
+      mes,
+      cantidadVentas: ventas.length,
+      totalVentas,
+      cantidadCompras: compras.length,
+      totalCompras,
+      ganancia: totalVentas - totalCompras,
+    }
   }
 
   // ── Reporte por cajero ───────────────────────────────────────────────────────
@@ -117,17 +199,25 @@ export class ReportesService {
       include: { usuario: { select: { id: true, nombre: true, rol: true } } },
     })
 
-    const porUsuario = new Map<number, {
-      usuario: { id: number; nombre: string; rol: string }
-      totalVentas: number
-      cantidadVentas: number
-      formaPago: Record<string, number>
-    }>()
+    const porUsuario = new Map<
+      number,
+      {
+        usuario: { id: number; nombre: string; rol: string }
+        totalVentas: number
+        cantidadVentas: number
+        formaPago: Record<string, number>
+      }
+    >()
 
     for (const v of ventas) {
       const uid = v.usuarioId
       if (!porUsuario.has(uid)) {
-        porUsuario.set(uid, { usuario: v.usuario, totalVentas: 0, cantidadVentas: 0, formaPago: {} })
+        porUsuario.set(uid, {
+          usuario: v.usuario,
+          totalVentas: 0,
+          cantidadVentas: 0,
+          formaPago: {},
+        })
       }
       const e = porUsuario.get(uid)!
       e.totalVentas += Number(v.total)
@@ -141,8 +231,11 @@ export class ReportesService {
         usuario: e.usuario,
         cantidadVentas: e.cantidadVentas,
         totalVentas: r2(e.totalVentas),
-        ticketPromedio: e.cantidadVentas > 0 ? r2(e.totalVentas / e.cantidadVentas) : 0,
-        ventasPorFormaPago: Object.fromEntries(Object.entries(e.formaPago).map(([k, v]) => [k, r2(v)])),
+        ticketPromedio:
+          e.cantidadVentas > 0 ? r2(e.totalVentas / e.cantidadVentas) : 0,
+        ventasPorFormaPago: Object.fromEntries(
+          Object.entries(e.formaPago).map(([k, v]) => [k, r2(v)]),
+        ),
       }))
       .sort((a, b) => b.totalVentas - a.totalVentas)
   }
@@ -158,18 +251,26 @@ export class ReportesService {
       },
     })
 
-    const porUsuario = new Map<number, {
-      usuario: { id: number; nombre: string; rol: string }
-      totalCompras: number
-      cantidadCompras: number
-      proveedores: Record<string, number>
-    }>()
+    const porUsuario = new Map<
+      number,
+      {
+        usuario: { id: number; nombre: string; rol: string }
+        totalCompras: number
+        cantidadCompras: number
+        proveedores: Record<string, number>
+      }
+    >()
 
     for (const c of compras) {
       if (!c.usuarioId || !c.usuario) continue
       const uid = c.usuarioId
       if (!porUsuario.has(uid)) {
-        porUsuario.set(uid, { usuario: c.usuario, totalCompras: 0, cantidadCompras: 0, proveedores: {} })
+        porUsuario.set(uid, {
+          usuario: c.usuario,
+          totalCompras: 0,
+          cantidadCompras: 0,
+          proveedores: {},
+        })
       }
       const e = porUsuario.get(uid)!
       e.totalCompras += Number(c.total)
@@ -194,7 +295,11 @@ export class ReportesService {
   async excelVentas(desde: string, hasta: string): Promise<Buffer> {
     const ventas = await this.prisma.venta.findMany({
       where: { fecha: this.rango(desde, hasta) },
-      include: { detalles: { include: { producto: true } }, cliente: true, usuario: { select: { id: true, nombre: true } } },
+      include: {
+        detalles: { include: { producto: true } },
+        cliente: true,
+        usuario: { select: { id: true, nombre: true } },
+      },
       orderBy: { fecha: 'desc' },
     })
 
@@ -223,16 +328,27 @@ export class ReportesService {
         fecha: this.fmtFecha(v.fecha),
         cliente: v.cliente?.nombre ?? 'Consumidor final',
         formaPago: v.formaPago ?? 'EFECTIVO',
-        descuento: Number(v.descuentoPct) > 0 ? `${Number(v.descuentoPct)}%` : '-',
+        descuento:
+          Number(v.descuentoPct) > 0 ? `${Number(v.descuentoPct)}%` : '-',
         total: r2(total),
-        comprobante: v.serieComprobante && v.numeroComprobante ? `${v.serieComprobante}-${String(v.numeroComprobante).padStart(8, '0')}` : '-',
+        comprobante:
+          v.serieComprobante && v.numeroComprobante
+            ? `${v.serieComprobante}-${String(v.numeroComprobante).padStart(8, '0')}`
+            : '-',
         vendedor: v.usuario?.nombre ?? '-',
       })
       this.filaAlterna(wsVentas, i + 2)
     })
-    const filaTotal = wsVentas.addRow({ cliente: 'TOTAL', total: r2(totalGeneral) })
+    const filaTotal = wsVentas.addRow({
+      cliente: 'TOTAL',
+      total: r2(totalGeneral),
+    })
     filaTotal.font = { bold: true }
-    filaTotal.getCell('total').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+    filaTotal.getCell('total').fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFDBEAFE' },
+    }
 
     // Hoja 2: Detalle de productos vendidos
     const wsDetalle = wb.addWorksheet('Detalle productos')
@@ -248,7 +364,14 @@ export class ReportesService {
     let row = 2
     for (const v of ventas) {
       for (const d of v.detalles) {
-        wsDetalle.addRow({ ventaId: v.id, fecha: this.fmtFecha(v.fecha), producto: d.producto.nombre, cantidad: d.cantidad, precio: r2(Number(d.precioUnitario)), subtotal: r2(Number(d.subtotal)) })
+        wsDetalle.addRow({
+          ventaId: v.id,
+          fecha: this.fmtFecha(v.fecha),
+          producto: d.producto.nombre,
+          cantidad: d.cantidad,
+          precio: r2(Number(d.precioUnitario)),
+          subtotal: r2(Number(d.subtotal)),
+        })
         this.filaAlterna(wsDetalle, row++)
       }
     }
@@ -260,7 +383,11 @@ export class ReportesService {
   async excelCompras(desde: string, hasta: string): Promise<Buffer> {
     const compras = await this.prisma.compra.findMany({
       where: { fecha: this.rango(desde, hasta) },
-      include: { detalles: { include: { producto: true } }, proveedor: true, usuario: { select: { id: true, nombre: true } } },
+      include: {
+        detalles: { include: { producto: true } },
+        proveedor: true,
+        usuario: { select: { id: true, nombre: true } },
+      },
       orderBy: { fecha: 'desc' },
     })
 
@@ -285,7 +412,10 @@ export class ReportesService {
         id: c.id,
         fecha: this.fmtFecha(c.fecha),
         proveedor: c.proveedor?.nombre ?? 'Sin proveedor',
-        comprobante: c.serieComprobante && c.numeroComprobante ? `${c.serieComprobante}-${c.numeroComprobante.padStart(8, '0')}` : '-',
+        comprobante:
+          c.serieComprobante && c.numeroComprobante
+            ? `${c.serieComprobante}-${c.numeroComprobante.padStart(8, '0')}`
+            : '-',
         total: r2(total),
         usuario: c.usuario?.nombre ?? '-',
       })
@@ -307,7 +437,14 @@ export class ReportesService {
     let row = 2
     for (const c of compras) {
       for (const d of c.detalles) {
-        wsDetalle.addRow({ compraId: c.id, fecha: this.fmtFecha(c.fecha), producto: d.producto.nombre, cantidad: d.cantidad, precio: r2(Number(d.precioCompra)), subtotal: r2(Number(d.subtotal)) })
+        wsDetalle.addRow({
+          compraId: c.id,
+          fecha: this.fmtFecha(c.fecha),
+          producto: d.producto.nombre,
+          cantidad: d.cantidad,
+          precio: r2(Number(d.precioCompra)),
+          subtotal: r2(Number(d.subtotal)),
+        })
         this.filaAlterna(wsDetalle, row++)
       }
     }
@@ -349,9 +486,15 @@ export class ReportesService {
         activo: p.activo ? 'Sí' : 'No',
       })
       if (p.stock === 0) {
-        rowData.getCell('estado').font = { bold: true, color: { argb: 'FFDC2626' } }
+        rowData.getCell('estado').font = {
+          bold: true,
+          color: { argb: 'FFDC2626' },
+        }
       } else if (bajo) {
-        rowData.getCell('estado').font = { bold: true, color: { argb: 'FFD97706' } }
+        rowData.getCell('estado').font = {
+          bold: true,
+          color: { argb: 'FFD97706' },
+        }
       } else {
         rowData.getCell('estado').font = { color: { argb: 'FF16A34A' } }
       }

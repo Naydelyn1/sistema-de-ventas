@@ -1,10 +1,23 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, ParseIntPipe, Request } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+  Request,
+} from '@nestjs/common'
 import { VentasService } from './ventas.service'
 import { CrearVentaDto } from './dto/crear-venta.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Ventas')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('ventas')
 export class VentasController {
@@ -12,7 +25,7 @@ export class VentasController {
 
   @Roles('ADMIN', 'CAJERO')
   @Post()
-  crear(@Body() dto: CrearVentaDto, @Request() req: any) {
+  crear(@Body() dto: CrearVentaDto, @Request() req: { user: { id: number } }) {
     return this.ventasService.crear(dto, req.user.id)
   }
 

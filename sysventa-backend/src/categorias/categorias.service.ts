@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CrearCategoriaDto } from './dto/crear-categoria.dto'
 
@@ -30,7 +34,10 @@ export class CategoriasService {
       where: { categoriaId: id },
       data: { activo: nuevoEstado },
     })
-    return this.prisma.categoria.update({ where: { id }, data: { activo: nuevoEstado } })
+    return this.prisma.categoria.update({
+      where: { id },
+      data: { activo: nuevoEstado },
+    })
   }
 
   async findOne(id: number) {

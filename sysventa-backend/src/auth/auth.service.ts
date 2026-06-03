@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
 import { LoginDto } from './dto/login.dto'
@@ -51,7 +55,8 @@ export class AuthService {
   async forgotPassword(email: string) {
     const usuario = await this.prisma.usuario.findUnique({ where: { email } })
     // Respuesta genérica para no revelar si el email existe
-    if (!usuario || !usuario.activo) return { message: 'Si el correo existe recibirás un enlace' }
+    if (!usuario || !usuario.activo)
+      return { message: 'Si el correo existe recibirás un enlace' }
 
     const token = crypto.randomBytes(32).toString('hex')
     const expiry = new Date(Date.now() + 30 * 60 * 1000) // 30 minutos
@@ -62,10 +67,16 @@ export class AuthService {
     })
 
     try {
-      await this.mailService.sendPasswordReset(usuario.email, usuario.nombre, token)
+      await this.mailService.sendPasswordReset(
+        usuario.email,
+        usuario.nombre,
+        token,
+      )
     } catch (err) {
       console.error('Error enviando email de recuperación:', err)
-      throw new BadRequestException('No se pudo enviar el correo. Verifica la configuración de email.')
+      throw new BadRequestException(
+        'No se pudo enviar el correo. Verifica la configuración de email.',
+      )
     }
     return { message: 'Si el correo existe recibirás un enlace' }
   }
@@ -75,7 +86,11 @@ export class AuthService {
       where: { resetToken: token },
     })
 
-    if (!usuario || !usuario.resetTokenExpiry || usuario.resetTokenExpiry < new Date()) {
+    if (
+      !usuario ||
+      !usuario.resetTokenExpiry ||
+      usuario.resetTokenExpiry < new Date()
+    ) {
       throw new BadRequestException('El enlace no es válido o ha expirado')
     }
 

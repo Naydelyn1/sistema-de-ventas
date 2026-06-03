@@ -1,10 +1,23 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, ParseIntPipe, Request } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+  Request,
+} from '@nestjs/common'
 import { ComprasService } from './compras.service'
 import { CrearCompraDto } from './dto/crear-compra.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Compras')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('compras')
 export class ComprasController {
@@ -12,7 +25,7 @@ export class ComprasController {
 
   @Roles('ADMIN', 'ALMACENERO')
   @Post()
-  crear(@Body() dto: CrearCompraDto, @Request() req: any) {
+  crear(@Body() dto: CrearCompraDto, @Request() req: { user: { id: number } }) {
     return this.comprasService.crear(dto, req.user.id)
   }
 

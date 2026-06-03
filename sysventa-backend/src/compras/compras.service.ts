@@ -13,7 +13,9 @@ export class ComprasService {
         where: { id: detalle.productoId },
       })
       if (!producto) {
-        throw new NotFoundException(`Producto ${detalle.productoId} no encontrado`)
+        throw new NotFoundException(
+          `Producto ${detalle.productoId} no encontrado`,
+        )
       }
     }
 
@@ -37,7 +39,9 @@ export class ComprasService {
           subtotal,
         })
 
-        const prodActual = await tx.producto.findUnique({ where: { id: detalle.productoId } })
+        const prodActual = await tx.producto.findUnique({
+          where: { id: detalle.productoId },
+        })
         const stockAntes = prodActual!.stock
         const stockDespues = stockAntes + detalle.cantidad
 
@@ -85,7 +89,7 @@ export class ComprasService {
   }
 
   async findAll(desde?: string, hasta?: string) {
-    const where: any = {}
+    const where: { fecha?: { gte: Date; lte: Date } } = {}
     if (desde && hasta) {
       where.fecha = {
         gte: new Date(desde + 'T00:00:00-05:00'),

@@ -8,7 +8,7 @@ dotenv.config()
 async function main() {
   const connectionString = process.env.DATABASE_URL as string
   const adapter = new PrismaPg({ connectionString })
-  const prisma = new PrismaClient({ adapter } as any)
+  const prisma = new PrismaClient({ adapter })
 
   const passwordHash = await bcrypt.hash('admin123', 10)
 
@@ -27,4 +27,4 @@ async function main() {
   await prisma.$disconnect()
 }
 
-main()
+void main()

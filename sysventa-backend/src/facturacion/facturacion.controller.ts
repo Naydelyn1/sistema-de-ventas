@@ -3,7 +3,10 @@ import { FacturacionService } from './facturacion.service'
 import { EmitirBoletaDto } from './dto/emitir-boleta.dto'
 import { EmitirFacturaDto } from './dto/emitir-factura.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Facturacion')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('facturacion')
 export class FacturacionController {

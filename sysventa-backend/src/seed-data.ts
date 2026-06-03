@@ -1,15 +1,15 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
-import * as dotenv from 'dotenv';
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@prisma/client'
+import * as dotenv from 'dotenv'
 
-dotenv.config();
+dotenv.config()
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL as string;
-  const adapter = new PrismaPg({ connectionString });
-  const prisma = new PrismaClient({ adapter });
+  const connectionString = process.env.DATABASE_URL as string
+  const adapter = new PrismaPg({ connectionString })
+  const prisma = new PrismaClient({ adapter })
 
-  console.log('🌱 Iniciando seed de farmacia...');
+  console.log('🌱 Iniciando seed de farmacia...')
 
   // CATEGORIAS nuevas (skipDuplicates evita pisar las que ya tienes)
   await prisma.categoria.createMany({
@@ -24,12 +24,12 @@ async function main() {
       { nombre: 'Higiene Personal' },
       { nombre: 'Material de Curacion' },
     ],
-  });
-  console.log('✅ Categorias creadas');
+  })
+  console.log('✅ Categorias creadas')
 
-  const categorias = await prisma.categoria.findMany();
+  const categorias = await prisma.categoria.findMany()
   const cat = (nombre: string) =>
-    categorias.find((c) => c.nombre === nombre)?.id;
+    categorias.find((c) => c.nombre === nombre)?.id
 
   // PRODUCTOS de farmacia
   await prisma.producto.createMany({
@@ -233,8 +233,8 @@ async function main() {
         categoriaId: cat('Material de Curacion')!,
       },
     ],
-  });
-  console.log('✅ Productos de farmacia creados');
+  })
+  console.log('✅ Productos de farmacia creados')
 
   // CLIENTES
   await prisma.cliente.createMany({
@@ -253,8 +253,8 @@ async function main() {
       { nombre: 'Carlos Lopez', dni: '89012345', telefono: '932109876' },
       { nombre: 'Elena Vargas', dni: '90123456', telefono: '921098765' },
     ],
-  });
-  console.log('✅ Clientes creados');
+  })
+  console.log('✅ Clientes creados')
 
   // PROVEEDORES
   await prisma.proveedor.createMany({
@@ -279,11 +279,11 @@ async function main() {
         email: 'contacto@acfarma.com',
       },
     ],
-  });
-  console.log('✅ Proveedores creados');
+  })
+  console.log('✅ Proveedores creados')
 
-  console.log('🎉 Seed de farmacia completado!');
-  await prisma.$disconnect();
+  console.log('🎉 Seed de farmacia completado!')
+  await prisma.$disconnect()
 }
 
-main().catch(console.error);
+main().catch(console.error)

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadGatewayException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadGatewayException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { CrearClienteDto } from './dto/crear-cliente.dto'
@@ -52,10 +56,17 @@ export class ClientesService {
   async consultarReniec(dni: string) {
     const token = this.configService.get<string>('RENIEC_API_TOKEN')
     try {
-      const { data } = await axios.get(
-        `https://api.decolecta.com/api/dni/${dni}`,
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 5000 },
-      )
+      const { data } = await axios.get<{
+        data: {
+          nombre_completo: string
+          apellido_paterno: string
+          apellido_materno: string
+          numero: string
+        }
+      }>(`https://api.decolecta.com/api/dni/${dni}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000,
+      })
       const d = data.data
       return {
         nombre: d.nombre_completo,
@@ -67,7 +78,9 @@ export class ClientesService {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status
         if (error.code === 'ECONNABORTED')
-          throw new BadGatewayException('Tiempo de espera agotado al consultar RENIEC')
+          throw new BadGatewayException(
+            'Tiempo de espera agotado al consultar RENIEC',
+          )
         if (status === 404)
           throw new NotFoundException('DNI no encontrado en RENIEC')
         if (status === 401)

@@ -1,10 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards, ParseIntPipe } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common'
 import { ProveedoresService } from './proveedores.service'
 import { CrearProveedorDto } from './dto/crear-proveedor.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Proveedores')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('proveedores')
 export class ProveedoresController {
@@ -30,7 +43,10 @@ export class ProveedoresController {
 
   @Roles('ADMIN', 'ALMACENERO')
   @Patch(':id')
-  actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearProveedorDto) {
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CrearProveedorDto,
+  ) {
     return this.proveedoresService.actualizar(id, dto)
   }
 

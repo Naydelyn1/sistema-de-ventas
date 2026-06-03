@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CrearUsuarioDto } from './dto/crear-usuario.dto'
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto'
@@ -74,7 +78,7 @@ export class UsuariosService {
   async actualizar(id: number, dto: ActualizarUsuarioDto) {
     await this.findOne(id)
 
-    const data: any = { ...dto }
+    const data: Record<string, unknown> = { ...dto }
 
     if (dto.password) {
       data.password = await bcrypt.hash(dto.password, 10)

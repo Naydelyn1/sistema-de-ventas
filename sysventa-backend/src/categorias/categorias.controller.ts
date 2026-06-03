@@ -1,10 +1,24 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, Query } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common'
 import { CategoriasService } from './categorias.service'
 import { CrearCategoriaDto } from './dto/crear-categoria.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Categorias')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('categorias')
 export class CategoriasController {
@@ -34,7 +48,10 @@ export class CategoriasController {
 
   @Roles('ADMIN', 'ALMACENERO')
   @Patch(':id')
-  actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearCategoriaDto) {
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CrearCategoriaDto,
+  ) {
     return this.categoriasService.actualizar(id, dto)
   }
 

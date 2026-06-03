@@ -1,8 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, ParseIntPipe, Query } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common'
 import { ClientesService } from './clientes.service'
 import { CrearClienteDto } from './dto/crear-cliente.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 
+@ApiTags('Clientes')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('clientes')
 export class ClientesController {
@@ -41,7 +54,10 @@ export class ClientesController {
   }
 
   @Patch(':id')
-  actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearClienteDto) {
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CrearClienteDto,
+  ) {
     return this.clientesService.actualizar(id, dto)
   }
 }
