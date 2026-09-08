@@ -8,7 +8,6 @@ import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
   const uploadsDir = join(process.cwd(), 'uploads', 'productos')
   if (!existsSync(uploadsDir)) {
     mkdirSync(uploadsDir, { recursive: true })

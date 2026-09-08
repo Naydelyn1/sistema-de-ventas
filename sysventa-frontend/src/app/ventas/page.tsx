@@ -5,7 +5,6 @@ import DashboardLayout from '@/components/DashboardLayout'
 import api from '@/lib/axios'
 import { getUsuario } from '@/lib/auth'
 import { Venta, Producto, Cliente, Categoria } from '@/lib/types'
-import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle, History } from 'lucide-react'
 import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle, History, Package } from 'lucide-react'
 import Link from 'next/link'
 import Toast from '@/components/Toast'
@@ -450,7 +449,6 @@ export default function VentasPage() {
     setCarrito((prev) => {
       const existente = prev.find((i) => i.productoId === prod.id)
       if (existente) return prev.map((i) => i.productoId === prod.id ? { ...i, cantidad: i.cantidad + cant } : i)
-      return [...prev, { productoId: prod.id, nombre: prod.nombre, precio: Number(prod.precio) || 0, cantidad: cant }]
       return [...prev, { productoId: prod.id, nombre: prod.nombre, precio: Number(prod.precio) || 0, cantidad: cant, imagenUrl: prod.imagenUrl }]
     })
     setProductoSelId('')
@@ -616,10 +614,6 @@ export default function VentasPage() {
                 {productoSelId && (() => {
                   const prod = productos.find((p) => p.id === parseInt(productoSelId))
                   return prod ? (
-                    <p className="text-sm font-semibold text-blue-700 px-1">
-                      S/ {(Number(prod.precio) || 0).toFixed(2)}
-                      <span className="text-xs font-normal text-gray-400 ml-2">stock: {prod.stock}</span>
-                    </p>
                     <div className="flex items-center gap-3 p-2 bg-blue-50/60 rounded-lg border border-blue-100">
                       {prod.imagenUrl ? (
                         <img
@@ -667,9 +661,6 @@ export default function VentasPage() {
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {carrito.map((item) => (
                     <div key={item.productoId} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-800 truncate">{item.nombre}</p>
-                        <p className="text-xs text-gray-500">x{item.cantidad} × S/ {(Number(item.precio) || 0).toFixed(2)}</p>
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         {item.imagenUrl ? (
                           <img

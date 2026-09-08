@@ -5,7 +5,6 @@ import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import api from '@/lib/axios'
 import { Producto, Categoria } from '@/lib/types'
-import { Plus, AlertTriangle, ToggleLeft, ToggleRight, X, Pencil, Search, Package, ShieldAlert, Tag } from 'lucide-react'
 import { Plus, AlertTriangle, ToggleLeft, ToggleRight, X, Pencil, Search, Package, ShieldAlert, Tag, Upload, Trash2, ImageIcon } from 'lucide-react'
 import Pagination from '@/components/Pagination'
 
@@ -78,7 +77,6 @@ export default function ProductosPage() {
   })
   const productosPag = productosFiltrados.slice((page - 1) * 10, page * 10)
 
-  const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm); setError('') }
   const closeModal = () => {
     setShowModal(false)
     setEditId(null)
@@ -187,9 +185,6 @@ export default function ProductosPage() {
       }
       closeModal()
       load()
-    } catch {
-      setError('Error al guardar el producto')
-      showToast('Error al guardar el producto', 'error')
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -323,11 +318,6 @@ export default function ProductosPage() {
                   ) : (
                     productosPag.map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-800">{p.nombre}</span>
-                            {p.stock <= p.stockMinimo && (
-                              <span title="Stock bajo"><AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" /></span>
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-3">
                             {p.imagenUrl ? (
