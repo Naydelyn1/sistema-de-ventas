@@ -6,7 +6,10 @@ import { useToast } from '@/hooks/useToast'
 import api from '@/lib/axios'
 import { Producto, Categoria } from '@/lib/types'
 import { Plus, AlertTriangle, ToggleLeft, ToggleRight, X, Pencil, Search, Package, ShieldAlert, Tag } from 'lucide-react'
+import { Plus, AlertTriangle, ToggleLeft, ToggleRight, X, Pencil, Search, Package, ShieldAlert, Tag, Upload, Trash2, ImageIcon } from 'lucide-react'
 import Pagination from '@/components/Pagination'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
 
 interface ProductoForm {
   nombre: string
@@ -19,12 +22,14 @@ interface ProductoForm {
   fechaVencimiento: string
   registroSanitario: string
   presentacion: string
+  imagenUrl: string
 }
 
 const initialForm: ProductoForm = {
   nombre: '', descripcion: '', precio: '', stock: '',
   stockMinimo: '', categoriaId: '', lote: '',
   fechaVencimiento: '', registroSanitario: '', presentacion: '',
+  imagenUrl: '',
 }
 
 export default function ProductosPage() {
@@ -34,6 +39,9 @@ export default function ProductosPage() {
   const [showModal, setShowModal] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<ProductoForm>(initialForm)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [previewModalUrl, setPreviewModalUrl] = useState<{ url: string; nombre: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [filtro, setFiltro] = useState<'todos' | 'activos' | 'inactivos'>('activos')
@@ -71,6 +79,14 @@ export default function ProductosPage() {
   const productosPag = productosFiltrados.slice((page - 1) * 10, page * 10)
 
   const closeModal = () => { setShowModal(false); setEditId(null); setForm(initialForm); setError('') }
+  const closeModal = () => {
+    setShowModal(false)
+    setEditId(null)
+    setForm(initialForm)
+    setSelectedFile(null)
+    setImagePreview(null)
+    setError('')
+  }
 
   const openEdit = (p: Producto) => {
     setEditId(p.id)
@@ -85,8 +101,33 @@ export default function ProductosPage() {
       fechaVencimiento: p.fechaVencimiento ? p.fechaVencimiento.split('T')[0] : '',
       registroSanitario: p.registroSanitario ?? '',
       presentacion: p.presentacion ?? '',
+      imagenUrl: p.imagenUrl ?? '',
     })
+    setImagePreview(p.imagenUrl ? `${API_URL}${p.imagenUrl}` : null)
+    setSelectedFile(null)
     setShowModal(true)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/)) {
+      setError('Formato inválido. Solo se admiten imágenes JPG, PNG, WEBP o GIF')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('La imagen no debe superar los 5 MB')
+      return
+    }
+    setError('')
+    setSelectedFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null)
+    setImagePreview(null)
+    setForm((prev) => ({ ...prev, imagenUrl: '' }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,6 +149,35 @@ export default function ProductosPage() {
       presentacion: form.presentacion || undefined,
     }
     try {
+      let finalImagenUrl: string | null = form.imagenUrl || null
+
+      if (selectedFile) {
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+        const uploadRes = await api.post<{ url: string }>('/productos/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        finalImagenUrl = uploadRes.data.url
+      } else if (!imagePreview) {
+        finalImagenUrl = null
+      }
+
+      const body = {
+        nombre: form.nombre,
+        descripcion: form.descripcion || undefined,
+        precio: parseFloat(form.precio),
+        stock: parseInt(form.stock),
+        stockMinimo: parseInt(form.stockMinimo),
+        categoriaId: parseInt(form.categoriaId),
+        lote: form.lote || undefined,
+        fechaVencimiento: form.fechaVencimiento
+          ? new Date(form.fechaVencimiento).toISOString()
+          : undefined,
+        registroSanitario: form.registroSanitario || undefined,
+        presentacion: form.presentacion || undefined,
+        imagenUrl: finalImagenUrl,
+      }
+
       if (editId) {
         await api.patch(`/productos/${editId}`, body)
         showToast('Producto actualizado correctamente')
@@ -120,6 +190,12 @@ export default function ProductosPage() {
     } catch {
       setError('Error al guardar el producto')
       showToast('Error al guardar el producto', 'error')
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Error al guardar el producto'
+      setError(msg)
+      showToast(msg, 'error')
     } finally {
       setSaving(false)
     }
@@ -252,7 +328,40 @@ export default function ProductosPage() {
                             <span className="font-medium text-gray-800">{p.nombre}</span>
                             {p.stock <= p.stockMinimo && (
                               <span title="Stock bajo"><AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" /></span>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-3">
+                            {p.imagenUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewModalUrl({ url: `${API_URL}${p.imagenUrl}`, nombre: p.nombre })}
+                                className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 shrink-0 hover:ring-2 hover:ring-blue-400 transition-all cursor-pointer group"
+                                title="Clic para ampliar imagen"
+                              >
+                                <img
+                                  src={`${API_URL}${p.imagenUrl}`}
+                                  alt={p.nombre}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                                />
+                              </button>
+                            ) : (
+                              <div
+                                className="w-10 h-10 rounded-lg bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center shrink-0 text-gray-400"
+                                title="Sin imagen"
+                              >
+                                <Package className="w-5 h-5" />
+                              </div>
                             )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-800">{p.nombre}</span>
+                                {p.stock <= p.stockMinimo && (
+                                  <span title="Stock bajo"><AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" /></span>
+                                )}
+                              </div>
+                              {p.presentacion && (
+                                <span className="text-xs text-gray-400 block">{p.presentacion}</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-500">{p.categoria?.nombre ?? '-'}</td>
@@ -318,6 +427,62 @@ export default function ProductosPage() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                {/* Foto del producto */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Foto del producto <span className="text-xs font-normal text-gray-400">(Opcional)</span>
+                  </label>
+                  {imagePreview ? (
+                    <div className="flex items-center gap-4 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                      <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-300 bg-white shrink-0 shadow-xs">
+                        <img
+                          src={imagePreview}
+                          alt="Vista previa"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-xs font-medium text-gray-700">Imagen del producto</p>
+                        <p className="text-[11px] text-gray-400">Esta imagen se mostrará en el catálogo y en ventas</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <label className="cursor-pointer px-3 py-1 bg-white hover:bg-gray-100 text-gray-700 text-xs font-medium border border-gray-300 rounded-lg transition-colors inline-block shadow-xs">
+                            Cambiar foto
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/gif"
+                              className="hidden"
+                              onChange={handleFileChange}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Quitar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl p-4 cursor-pointer bg-gray-50/60 hover:bg-blue-50/30 transition-all text-center group">
+                      <div className="w-9 h-9 rounded-full bg-white shadow-xs border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-blue-600 mb-1.5 transition-colors">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <p className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition-colors">
+                        Subir foto del medicamento o producto
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">JPG, PNG o WEBP (máx. 5 MB)</p>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
                   <input
@@ -449,6 +614,38 @@ export default function ProductosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para ver imagen ampliada */}
+      {previewModalUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewModalUrl(null)}
+        >
+          <div
+            className="bg-white rounded-2xl overflow-hidden shadow-2xl max-w-sm w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h4 className="text-sm font-semibold text-gray-800 truncate pr-2">
+                {previewModalUrl.nombre}
+              </h4>
+              <button
+                onClick={() => setPreviewModalUrl(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 bg-gray-50 flex items-center justify-center max-h-[70vh] overflow-auto">
+              <img
+                src={previewModalUrl.url}
+                alt={previewModalUrl.nombre}
+                className="max-h-[60vh] max-w-full object-contain rounded-lg shadow-sm"
+              />
+            </div>
           </div>
         </div>
       )}

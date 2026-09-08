@@ -11,7 +11,7 @@ import { EmitirFacturaDto } from './dto/emitir-factura.dto'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
-interface NubefactResponse {
+export interface NubefactResponse {
   serie: string
   numero: number
   enlace_del_pdf: string

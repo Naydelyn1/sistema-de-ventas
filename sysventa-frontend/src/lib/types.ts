@@ -28,6 +28,7 @@ export interface Producto {
   fechaVencimiento?: string
   registroSanitario?: string
   presentacion?: string
+  imagenUrl?: string | null
 }
 
 export interface Cliente {

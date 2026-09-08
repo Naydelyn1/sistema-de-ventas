@@ -8,7 +8,14 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { diskStorage } from 'multer'
+import { extname, join } from 'path'
+import { existsSync, mkdirSync } from 'fs'
 import { ProductosService } from './productos.service'
 import { CrearProductoDto } from './dto/crear-producto.dto'
 import { ActualizarProductoDto } from './dto/actualizar-producto.dto'
@@ -16,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger'
 
 @ApiTags('Productos')
 @ApiBearerAuth()
@@ -23,6 +31,59 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 @Controller('productos')
 export class ProductosController {
   constructor(private readonly productosService: ProductosService) {}
+
+  @Roles('ADMIN', 'ALMACENERO')
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = join(process.cwd(), 'uploads', 'productos')
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true })
+          }
+          cb(null, uploadPath)
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+          const ext = extname(file.originalname).toLowerCase()
+          cb(null, `prod-${uniqueSuffix}${ext}`)
+        },
+      }),
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+      },
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|webp|gif)$/)) {
+          return cb(
+            new BadRequestException(
+              'Solo se permiten imágenes (JPG, PNG, WEBP, GIF)',
+            ),
+            false,
+          )
+        }
+        cb(null, true)
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  uploadImagen(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No se ha proporcionado ninguna imagen')
+    }
+    return { url: `/uploads/productos/${file.filename}` }
+  }
 
   @Roles('ADMIN', 'ALMACENERO')
   @Post()

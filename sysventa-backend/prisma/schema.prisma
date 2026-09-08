@@ -54,6 +54,7 @@ model Producto {
   fechaVencimiento  DateTime?
   registroSanitario String?
   presentacion      String?
+  imagenUrl         String?
 }
 
 model MovimientoStock {

@@ -6,6 +6,7 @@ import api from '@/lib/axios'
 import { getUsuario } from '@/lib/auth'
 import { Venta, Producto, Cliente, Categoria } from '@/lib/types'
 import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle, History } from 'lucide-react'
+import { Plus, Trash2, ShoppingCart, Printer, X, Search, Loader2, UserCheck, ArrowLeft, FileText, Receipt, ExternalLink, QrCode, CheckCircle, AlertTriangle, History, Package } from 'lucide-react'
 import Link from 'next/link'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
@@ -15,11 +16,14 @@ import QRCode from 'react-qr-code'
 import { generarQRPago } from '@/lib/qr-pago'
 import Image from 'next/image'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
+
 interface ItemCarrito {
   productoId: number
   nombre: string
   precio: number
   cantidad: number
+  imagenUrl?: string | null
 }
 
 interface ClienteReniec {
@@ -447,6 +451,7 @@ export default function VentasPage() {
       const existente = prev.find((i) => i.productoId === prod.id)
       if (existente) return prev.map((i) => i.productoId === prod.id ? { ...i, cantidad: i.cantidad + cant } : i)
       return [...prev, { productoId: prod.id, nombre: prod.nombre, precio: Number(prod.precio) || 0, cantidad: cant }]
+      return [...prev, { productoId: prod.id, nombre: prod.nombre, precio: Number(prod.precio) || 0, cantidad: cant, imagenUrl: prod.imagenUrl }]
     })
     setProductoSelId('')
     setCantidad('1')
@@ -615,6 +620,28 @@ export default function VentasPage() {
                       S/ {(Number(prod.precio) || 0).toFixed(2)}
                       <span className="text-xs font-normal text-gray-400 ml-2">stock: {prod.stock}</span>
                     </p>
+                    <div className="flex items-center gap-3 p-2 bg-blue-50/60 rounded-lg border border-blue-100">
+                      {prod.imagenUrl ? (
+                        <img
+                          src={`${API_URL}${prod.imagenUrl}`}
+                          alt={prod.nombre}
+                          className="w-10 h-10 rounded-md object-cover border border-blue-200 shrink-0 bg-white shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-white border border-blue-200 flex items-center justify-center shrink-0 text-blue-400">
+                          <Package className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-blue-700">
+                          S/ {(Number(prod.precio) || 0).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Stock: <span className="font-semibold text-gray-700">{prod.stock}</span>
+                          {prod.presentacion && <span className="text-gray-400 ml-1">({prod.presentacion})</span>}
+                        </p>
+                      </div>
+                    </div>
                   ) : null
                 })()}
                 <div className="flex gap-2">
@@ -643,6 +670,22 @@ export default function VentasPage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-800 truncate">{item.nombre}</p>
                         <p className="text-xs text-gray-500">x{item.cantidad} × S/ {(Number(item.precio) || 0).toFixed(2)}</p>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        {item.imagenUrl ? (
+                          <img
+                            src={`${API_URL}${item.imagenUrl}`}
+                            alt={item.nombre}
+                            className="w-8 h-8 rounded-md object-cover border border-gray-200 shrink-0 bg-white"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-md bg-gray-200/70 flex items-center justify-center shrink-0 text-gray-400">
+                            <Package className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 truncate">{item.nombre}</p>
+                          <p className="text-xs text-gray-500">x{item.cantidad} × S/ {(Number(item.precio) || 0).toFixed(2)}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
                         <span className="text-sm font-semibold text-gray-800">
