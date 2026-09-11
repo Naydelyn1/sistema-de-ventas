@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsOptional, Min, ValidateIf } from 'class-validator'
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  Min,
+  ValidateIf,
+} from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
@@ -59,7 +65,10 @@ export class ActualizarProductoDto {
   @IsString()
   presentacion?: string
 
-  @ApiPropertyOptional({ example: '/uploads/productos/1712345678-producto.png', nullable: true })
+  @ApiPropertyOptional({
+    example: '/uploads/productos/1712345678-producto.png',
+    nullable: true,
+  })
   @IsOptional()
   @ValidateIf((o, v) => v !== null)
   @IsString()
